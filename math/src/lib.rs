@@ -38,7 +38,7 @@ mod impls {
             let w = e4 - w*e0;
             let origin = ((e1 ^ e2) ^ e3) ^ e4;
             // join the point to the origin to make a line, then get the lines intersection with the hyperplane at infinity
-            let point = ((((x ^ y) ^ z) ^ w) & origin) ^ e0;
+            let point = (origin & (((x ^ y) ^ z) ^ w)) ^ e0;
 
             let transformed = (~rotor * point) * rotor;
 
@@ -62,7 +62,7 @@ mod impls {
             let w = e4 - 0*e0;
             let origin = ((e1 ^ e2) ^ e3) ^ e4;
             // join the point to the origin to make a line, then get the lines intersection with the hyperplane at infinity
-            let point = ((((x ^ y) ^ z) ^ w) & origin) ^ e0;
+            let point = (origin & (((x ^ y) ^ z) ^ w)) ^ e0;
 
             let transformed = (~rotor * point) * rotor;
 
@@ -86,7 +86,7 @@ mod impls {
             let w = e4 - 0*e0;
             let origin = ((e1 ^ e2) ^ e3) ^ e4;
             // join the point to the origin to make a line, then get the lines intersection with the hyperplane at infinity
-            let point = ((((x ^ y) ^ z) ^ w) & origin) ^ e0;
+            let point = (origin & (((x ^ y) ^ z) ^ w)) ^ e0;
 
             let transformed = (~rotor * point) * rotor;
 
@@ -110,7 +110,7 @@ mod impls {
             let w = e4 - 0*e0;
             let origin = ((e1 ^ e2) ^ e3) ^ e4;
             // join the point to the origin to make a line, then get the lines intersection with the hyperplane at infinity
-            let point = ((((x ^ y) ^ z) ^ w) & origin) ^ e0;
+            let point = (origin & (((x ^ y) ^ z) ^ w)) ^ e0;
 
             let transformed = (~rotor * point) * rotor;
 
@@ -134,7 +134,7 @@ mod impls {
             let w = e4 - 1*e0;
             let origin = ((e1 ^ e2) ^ e3) ^ e4;
             // join the point to the origin to make a line, then get the lines intersection with the hyperplane at infinity
-            let point = ((((x ^ y) ^ z) ^ w) & origin) ^ e0;
+            let point = (origin & (((x ^ y) ^ z) ^ w)) ^ e0;
 
             let transformed = (~rotor * point) * rotor;
 

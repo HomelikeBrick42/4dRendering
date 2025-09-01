@@ -8,6 +8,6 @@ elided_lifetimes_in_paths = "deny"
 [workspace.dependencies]
 bytemuck = { version = "1.23.2", features = ["derive"] }
 cgmath = "0.18.0"
-eframe = { version = "0.32.1", features = ["wgpu"] }
+eframe = { version = "0.32.1", features = ["wgpu", "persistence"] }
 math = { path = "./math" }
 rendering = { path = "./rendering" }
