@@ -1,0 +1,12 @@
+[workspace]
+resolver = "3"
+members = ["app", "math", "rendering"]
+
+[workspace.lints.rust]
+elided_lifetimes_in_paths = "deny"
+
+[workspace.dependencies]
+cgmath = "0.18.0"
+eframe = { version = "0.32.1", features = ["wgpu"] }
+math = { path = "./math" }
+rendering = { path = "./rendering" }
