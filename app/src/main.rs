@@ -61,6 +61,15 @@ impl eframe::App for App {
                     ui.label("Position:");
                     ui_vector4(ui, &mut self.camera.position);
                 });
+                ui.horizontal(|ui| {
+                    ui.label("Move Speed:");
+                    ui.add(egui::DragValue::new(&mut self.camera.move_speed).speed(0.1));
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Rotation Speed:");
+                    ui.add(egui::DragValue::new(&mut self.camera.rotation_speed).speed(0.1));
+                    self.camera.rotation_speed = self.camera.rotation_speed.max(0.0);
+                });
                 ui.add_enabled_ui(false, |ui| {
                     ui.horizontal(|ui| {
                         ui.label("Forward:");

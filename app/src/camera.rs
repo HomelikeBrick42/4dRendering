@@ -6,6 +6,9 @@ pub struct Camera {
     pub position: cgmath::Vector4<f32>,
     pub main_rotation: Rotor,
     pub xy_rotation: f32,
+
+    pub move_speed: f32,
+    pub rotation_speed: f32,
 }
 
 impl Camera {
@@ -14,6 +17,9 @@ impl Camera {
             position,
             main_rotation: Rotor::identity(),
             xy_rotation: 0.0,
+
+            move_speed: 2.0,
+            rotation_speed: 0.5,
         }
     }
 
@@ -26,8 +32,8 @@ impl Camera {
     }
 
     pub fn update(&mut self, ts: f32, i: &egui::InputState) {
-        let mut move_speed = 2.0;
-        let rotation_speed = 1.0 * TAU;
+        let mut move_speed = self.move_speed;
+        let rotation_speed = self.rotation_speed * TAU;
 
         if i.modifiers.shift {
             move_speed *= 2.0;
