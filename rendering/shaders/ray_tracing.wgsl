@@ -77,9 +77,14 @@ fn intersect_scene(ray: Ray) -> Hit {
     return closest_hit;
 }
 
+const SUN_DIRECTION: vec4<f32> = vec4<f32>(- 0.1, 1.0, 0.3, 0.1);
+
 fn sky_color(ray: Ray) -> vec3<f32> {
     let up = vec3<f32>(0.4, 0.5, 0.8);
     let down = vec3<f32>(0.2, 0.2, 0.3);
+    if dot(ray.direction, normalize(SUN_DIRECTION)) > 0.99 {
+        return vec3<f32>(1.0);
+    }
     return mix(down, up, ray.direction.y * 0.5 + 0.5);
 }
 
@@ -88,7 +93,7 @@ fn trace_ray(ray: Ray) -> vec3<f32> {
     if hit.hit {
         var sun_ray: Ray;
         sun_ray.origin = hit.position + hit.normal * 0.001;
-        sun_ray.direction = normalize(vec4<f32>(- 0.1, 1.0, 0.3, 0.4));
+        sun_ray.direction = normalize(SUN_DIRECTION);
 
         let sun_hit = intersect_scene(sun_ray);
 
