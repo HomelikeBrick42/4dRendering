@@ -2,13 +2,13 @@ pub mod camera;
 
 use crate::camera::Camera;
 use eframe::{egui, wgpu};
-use math::Transform;
+use math::{Rotor, Transform};
 use rendering::{
     RenderData, RenderState, RenderTarget, ViewAxes,
     objects::{Hyperplane, Hypersphere},
     register_rendering_state,
 };
-use std::{sync::Arc, time::Instant};
+use std::{f32::consts::TAU, sync::Arc, time::Instant};
 
 struct App {
     last_time: Option<Instant>,
@@ -100,6 +100,21 @@ impl eframe::App for App {
                     ui.label("Rotation Speed:");
                     ui.add(egui::DragValue::new(&mut self.camera.rotation_speed).speed(0.1));
                     self.camera.rotation_speed = self.camera.rotation_speed.max(0.0);
+                });
+                ui.collapsing("Align", |ui| {
+                    if ui.button("Reset XY Rotation").clicked() {
+                        self.camera.xy_rotation = 0.0;
+                    }
+                    ui.label("These align buttons assume that the current XY rotation is 0");
+                    if ui.button("Align XYZ").clicked() {
+                        self.camera.main_rotation = Rotor::identity();
+                    }
+                    if ui.button("Align XWZ").clicked() {
+                        self.camera.main_rotation = Rotor::rotate_yw(0.25 * TAU);
+                    }
+                    if ui.button("Align XYW").clicked() {
+                        self.camera.main_rotation = Rotor::rotate_zw(0.25 * TAU);
+                    }
                 });
                 ui.add_enabled_ui(false, |ui| {
                     let transform = self.camera.transform();
