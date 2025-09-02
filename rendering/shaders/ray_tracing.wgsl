@@ -105,7 +105,9 @@ fn ray_trace(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let aspect = f32(size.x) / f32(size.y);
     let uv = ((vec2<f32>(coords) + 0.5) / vec2<f32>(size)) * 2.0 - 1.0;
 
-    let ray = Ray(camera.position, normalize(camera.forward + camera.up * uv.y + camera.right * uv.x * aspect));
+    var ray: Ray;
+    ray.origin = camera.position;
+    ray.direction = normalize(camera.forward + camera.up * uv.y + camera.right * uv.x * aspect);
 
     let color = trace_ray(ray);
     textureStore(output_texture, coords, vec4<f32>(clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)), 1.0));
