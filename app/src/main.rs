@@ -1,9 +1,11 @@
+pub mod camera;
+
 use crate::camera::Camera;
 use eframe::{egui, wgpu};
-use rendering::{HyperSphere, RenderData, RenderState, ViewAxes, register_rendering_state};
+use rendering::{
+    HyperSphere, RenderData, RenderState, RenderTarget, ViewAxes, register_rendering_state,
+};
 use std::{sync::Arc, time::Instant};
-
-pub mod camera;
 
 struct App {
     last_time: Option<Instant>,
@@ -12,11 +14,17 @@ struct App {
 
     camera_window_open: bool,
     camera: Camera,
+
+    xyz_render_target: RenderTarget,
 }
 
 impl App {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        let eframe::egui_wgpu::RenderState { device, .. } = cc.wgpu_render_state.as_ref().unwrap();
+
         register_rendering_state(cc);
+
+        let xyz_render_target = RenderTarget::new(device, 1, 1);
 
         Self {
             last_time: None,
@@ -30,6 +38,8 @@ impl App {
                 z: 0.0,
                 w: 0.0,
             }),
+
+            xyz_render_target,
         }
     }
 }
@@ -135,13 +145,16 @@ impl eframe::App for App {
                 let (rect, _response) =
                     ui.allocate_exact_size(ui.available_size(), egui::Sense::all());
 
+                self.xyz_render_target
+                    .maybe_resize(device, rect.width() as _, rect.height() as _);
+
                 ui.painter()
                     .add(eframe::egui_wgpu::Callback::new_paint_callback(
                         rect,
                         RenderData {
+                            render_target: self.xyz_render_target.clone(),
                             camera_transform: self.camera.transform(),
                             view_axes: ViewAxes::XYZ,
-                            aspect: rect.width() / rect.height(),
                         },
                     ));
             });

@@ -1,3 +1,7 @@
+mod render_target;
+
+pub use render_target::RenderTarget;
+
 use eframe::{egui, wgpu};
 use math::Transform;
 use std::mem::offset_of;
@@ -9,7 +13,6 @@ struct Camera {
     pub forward: cgmath::Vector4<f32>,
     pub up: cgmath::Vector4<f32>,
     pub right: cgmath::Vector4<f32>,
-    pub aspect: f32,
 }
 
 unsafe impl bytemuck::Zeroable for Camera {}
@@ -41,11 +44,15 @@ pub struct RenderState {
     hyper_spheres_bind_group: wgpu::BindGroup,
 
     ray_tracing_compute_pipeline: wgpu::ComputePipeline,
+    full_screen_quad_render_pipeline: wgpu::RenderPipeline,
 }
 
 pub fn register_rendering_state(cc: &eframe::CreationContext<'_>) {
     let eframe::egui_wgpu::RenderState {
-        device, renderer, ..
+        device,
+        renderer,
+        target_format,
+        ..
     } = cc.wgpu_render_state.as_ref().unwrap();
 
     let scene_info_bind_group_layout =
@@ -98,12 +105,13 @@ pub fn register_rendering_state(cc: &eframe::CreationContext<'_>) {
         &hyper_spheres_buffer,
     );
 
-    let shader = device.create_shader_module(wgpu::include_wgsl!("../shaders/ray_tracing.wgsl"));
-
+    let ray_tracing_shader =
+        device.create_shader_module(wgpu::include_wgsl!("../shaders/ray_tracing.wgsl"));
     let ray_tracing_compute_pipeline_layout =
         device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Ray Tracing Compute Pipeline Layout"),
             bind_group_layouts: &[
+                &render_target::write_bind_group_layout(device),
                 &scene_info_bind_group_layout,
                 &hyper_spheres_bind_group_layout,
             ],
@@ -116,10 +124,57 @@ pub fn register_rendering_state(cc: &eframe::CreationContext<'_>) {
         device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: Some("Ray Tracing Compute Pipeline"),
             layout: Some(&ray_tracing_compute_pipeline_layout),
-            module: &shader,
+            module: &ray_tracing_shader,
             entry_point: Some("ray_trace"),
             compilation_options: Default::default(),
             cache: Default::default(),
+        });
+
+    let full_screen_quad_shader =
+        device.create_shader_module(wgpu::include_wgsl!("../shaders/full_screen_quad.wgsl"));
+    let full_screen_quad_render_pipeline_layout =
+        device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("Full Screen Quad Render Pipeline Layout"),
+            bind_group_layouts: &[&render_target::sample_bind_group_layout(device)],
+            push_constant_ranges: &[],
+        });
+    let full_screen_quad_render_pipeline =
+        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Full Screen Quad Render Pipeline"),
+            layout: Some(&full_screen_quad_render_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &full_screen_quad_shader,
+                entry_point: Some("vertex"),
+                compilation_options: Default::default(),
+                buffers: &[],
+            },
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleStrip,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Cw,
+                cull_mode: None,
+                unclipped_depth: false,
+                polygon_mode: wgpu::PolygonMode::Fill,
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState {
+                count: 1,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &full_screen_quad_shader,
+                entry_point: Some("fragment"),
+                compilation_options: Default::default(),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: *target_format,
+                    blend: None,
+                    write_mask: wgpu::ColorWrites::all(),
+                })],
+            }),
+            multiview: None,
+            cache: None,
         });
 
     renderer.write().callback_resources.insert(RenderState {
@@ -131,6 +186,7 @@ pub fn register_rendering_state(cc: &eframe::CreationContext<'_>) {
         hyper_spheres_bind_group,
 
         ray_tracing_compute_pipeline,
+        full_screen_quad_render_pipeline,
     });
 }
 
@@ -196,9 +252,9 @@ pub enum ViewAxes {
 }
 
 pub struct RenderData {
+    pub render_target: RenderTarget,
     pub camera_transform: Transform,
     pub view_axes: ViewAxes,
-    pub aspect: f32,
 }
 
 impl eframe::egui_wgpu::CallbackTrait for RenderData {
@@ -223,38 +279,31 @@ impl eframe::egui_wgpu::CallbackTrait for RenderData {
             });
 
             compute_pass.set_pipeline(&state.ray_tracing_compute_pipeline);
-            compute_pass.set_bind_group(0, &state.scene_info_bind_group, &[]);
-            compute_pass.set_bind_group(1, &state.hyper_spheres_bind_group, &[]);
-            compute_pass.set_push_constants(
-                0,
-                bytemuck::bytes_of(&{
-                    let (forward, up, right) = match self.view_axes {
-                        ViewAxes::XYZ => (
-                            self.camera_transform.x(),
-                            self.camera_transform.y(),
-                            self.camera_transform.z(),
-                        ),
-                        ViewAxes::XWZ => (
-                            self.camera_transform.x(),
-                            self.camera_transform.w(),
-                            self.camera_transform.z(),
-                        ),
-                        ViewAxes::XYW => (
-                            self.camera_transform.x(),
-                            self.camera_transform.y(),
-                            self.camera_transform.w(),
-                        ),
-                    };
-                    Camera {
-                        position: self.camera_transform.position(),
-                        forward,
-                        up,
-                        right,
-                        aspect: self.aspect,
-                    }
-                }),
-            );
-            compute_pass.dispatch_workgroups(1, 1, 1);
+            compute_pass.set_bind_group(0, &self.render_target.write_bind_group, &[]);
+            compute_pass.set_bind_group(1, &state.scene_info_bind_group, &[]);
+            compute_pass.set_bind_group(2, &state.hyper_spheres_bind_group, &[]);
+
+            let camera = {
+                let x = self.camera_transform.x();
+                let y = self.camera_transform.y();
+                let z = self.camera_transform.z();
+                let w = self.camera_transform.w();
+                let (forward, up, right) = match self.view_axes {
+                    ViewAxes::XYZ => (x, y, z),
+                    ViewAxes::XWZ => (x, w, z),
+                    ViewAxes::XYW => (x, y, w),
+                };
+                Camera {
+                    position: self.camera_transform.position(),
+                    forward,
+                    up,
+                    right,
+                }
+            };
+            compute_pass.set_push_constants(0, bytemuck::bytes_of(&camera));
+
+            let (width, height) = self.render_target.size();
+            compute_pass.dispatch_workgroups(width.div_ceil(16), height.div_ceil(16), 1);
         }
 
         vec![encoder.finish()]
@@ -263,9 +312,13 @@ impl eframe::egui_wgpu::CallbackTrait for RenderData {
     fn paint(
         &self,
         _info: egui::PaintCallbackInfo,
-        _render_pass: &mut wgpu::RenderPass<'static>,
+        render_pass: &mut wgpu::RenderPass<'static>,
         callback_resources: &eframe::egui_wgpu::CallbackResources,
     ) {
-        let _state: &RenderState = callback_resources.get().unwrap();
+        let state: &RenderState = callback_resources.get().unwrap();
+
+        render_pass.set_pipeline(&state.full_screen_quad_render_pipeline);
+        render_pass.set_bind_group(0, &self.render_target.sample_bind_group, &[]);
+        render_pass.draw(0..4, 0..1);
     }
 }
