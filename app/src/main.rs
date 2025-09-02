@@ -99,21 +99,26 @@ impl eframe::App for App {
                     self.camera.rotation_speed = self.camera.rotation_speed.max(0.0);
                 });
                 ui.add_enabled_ui(false, |ui| {
+                    let transform = self.camera.transform();
+                    ui.horizontal(|ui| {
+                        ui.label("Position:");
+                        ui_vector4(ui, &mut transform.position());
+                    });
                     ui.horizontal(|ui| {
                         ui.label("Forward:");
-                        ui_vector4(ui, &mut self.camera.rotation().x());
+                        ui_vector4(ui, &mut transform.x());
                     });
                     ui.horizontal(|ui| {
                         ui.label("Up:");
-                        ui_vector4(ui, &mut self.camera.rotation().y());
+                        ui_vector4(ui, &mut transform.y());
                     });
                     ui.horizontal(|ui| {
                         ui.label("Right:");
-                        ui_vector4(ui, &mut self.camera.rotation().z());
+                        ui_vector4(ui, &mut transform.z());
                     });
                     ui.horizontal(|ui| {
                         ui.label("Ana:");
-                        ui_vector4(ui, &mut self.camera.rotation().w());
+                        ui_vector4(ui, &mut transform.w());
                     });
                 });
                 ui.allocate_space(ui.available_size());

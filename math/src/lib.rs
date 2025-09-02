@@ -24,7 +24,7 @@ mod impls {
         }
 
         fn rotor_then(a: Rotor, b: Rotor) -> Rotor {
-            return a * b;
+            return b * a;
         }
 
         fn rotor_reverse(rotor: Rotor) -> Rotor {
@@ -165,7 +165,7 @@ mod impls {
         }
 
         fn transform_then(a: Transform, b: Transform) -> Transform {
-            return a * b;
+            return b * a;
         }
 
         fn transform_reverse(transform: Transform) -> Transform {

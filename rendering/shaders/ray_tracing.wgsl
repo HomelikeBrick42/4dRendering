@@ -86,7 +86,7 @@ fn sky_color(ray: Ray) -> vec3<f32> {
 fn trace_ray(ray: Ray) -> vec3<f32> {
     let hit = intersect_scene(ray);
     if hit.hit {
-        return hit.color;
+        return hit.color * max(0.1, dot(hit.normal, normalize(vec4<f32>(0.1, 1.0, 0.3, 0.4))));
     }
     else {
         return sky_color(ray);
