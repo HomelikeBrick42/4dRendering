@@ -1,6 +1,7 @@
 use crate::camera::Camera;
 use eframe::{egui, wgpu};
-use std::time::Instant;
+use rendering::{HyperSphere, RenderData, RenderState, ViewAxes, register_rendering_state};
+use std::{sync::Arc, time::Instant};
 
 pub mod camera;
 
@@ -14,7 +15,9 @@ struct App {
 }
 
 impl App {
-    fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+    fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        register_rendering_state(cc);
+
         Self {
             last_time: None,
 
@@ -32,7 +35,14 @@ impl App {
 }
 
 impl eframe::App for App {
-    fn update(&mut self, ctx: &eframe::egui::Context, _frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &eframe::egui::Context, frame: &mut eframe::Frame) {
+        let eframe::egui_wgpu::RenderState {
+            device,
+            queue,
+            renderer,
+            ..
+        } = frame.wgpu_render_state().unwrap();
+
         let time = Instant::now();
         let dt = (time - self.last_time.unwrap_or(time)).as_secs_f32();
         self.last_time = Some(time);
@@ -73,19 +83,19 @@ impl eframe::App for App {
                 ui.add_enabled_ui(false, |ui| {
                     ui.horizontal(|ui| {
                         ui.label("Forward:");
-                        ui_vector4(ui, &mut self.camera.rotation().forward());
+                        ui_vector4(ui, &mut self.camera.rotation().x());
                     });
                     ui.horizontal(|ui| {
                         ui.label("Up:");
-                        ui_vector4(ui, &mut self.camera.rotation().up());
+                        ui_vector4(ui, &mut self.camera.rotation().y());
                     });
                     ui.horizontal(|ui| {
                         ui.label("Right:");
-                        ui_vector4(ui, &mut self.camera.rotation().right());
+                        ui_vector4(ui, &mut self.camera.rotation().z());
                     });
                     ui.horizontal(|ui| {
                         ui.label("Ana:");
-                        ui_vector4(ui, &mut self.camera.rotation().ana());
+                        ui_vector4(ui, &mut self.camera.rotation().w());
                     });
                 });
                 ui.allocate_space(ui.available_size());
@@ -95,10 +105,45 @@ impl eframe::App for App {
             ctx.input(|i| self.camera.update(dt, i));
         }
 
+        {
+            let callback_resources = &mut renderer.write().callback_resources;
+            let render_state: &mut RenderState = callback_resources.get_mut().unwrap();
+
+            render_state.update_hyper_spheres(
+                device,
+                queue,
+                &[HyperSphere {
+                    position: cgmath::Vector4 {
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                        w: 0.0,
+                    },
+                    color: cgmath::Vector3 {
+                        x: 1.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
+                    radius: 1.0,
+                }],
+            );
+        }
+
         egui::CentralPanel::default()
             .frame(egui::Frame::NONE)
             .show(ctx, |ui| {
-                _ = ui;
+                let (rect, _response) =
+                    ui.allocate_exact_size(ui.available_size(), egui::Sense::all());
+
+                ui.painter()
+                    .add(eframe::egui_wgpu::Callback::new_paint_callback(
+                        rect,
+                        RenderData {
+                            camera_transform: self.camera.transform(),
+                            view_axes: ViewAxes::XYZ,
+                            aspect: rect.width() / rect.height(),
+                        },
+                    ));
             });
 
         ctx.request_repaint();
@@ -113,6 +158,18 @@ fn main() -> eframe::Result {
             renderer: eframe::Renderer::Wgpu,
             wgpu_options: eframe::egui_wgpu::WgpuConfiguration {
                 present_mode: wgpu::PresentMode::AutoNoVsync,
+                wgpu_setup: eframe::egui_wgpu::WgpuSetup::CreateNew(
+                    eframe::egui_wgpu::WgpuSetupCreateNew {
+                        device_descriptor: Arc::new(|adapter| wgpu::DeviceDescriptor {
+                            label: Some("Device"),
+                            required_features: wgpu::Features::PUSH_CONSTANTS,
+                            required_limits: adapter.limits(),
+                            memory_hints: wgpu::MemoryHints::Performance,
+                            trace: wgpu::Trace::Off,
+                        }),
+                        ..Default::default()
+                    },
+                ),
                 ..Default::default()
             },
             ..Default::default()

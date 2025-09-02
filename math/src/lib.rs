@@ -310,28 +310,28 @@ mod impls {
         }
 
         #[inline]
-        pub fn forward(self) -> cgmath::Vector4<f32> {
+        pub fn x(self) -> cgmath::Vector4<f32> {
             let (Scalar { s: x }, Scalar { s: y }, Scalar { s: z }, Scalar { s: w }) =
                 rotor_x(self);
             cgmath::Vector4 { x, y, z, w }
         }
 
         #[inline]
-        pub fn up(self) -> cgmath::Vector4<f32> {
+        pub fn y(self) -> cgmath::Vector4<f32> {
             let (Scalar { s: x }, Scalar { s: y }, Scalar { s: z }, Scalar { s: w }) =
                 rotor_y(self);
             cgmath::Vector4 { x, y, z, w }
         }
 
         #[inline]
-        pub fn right(self) -> cgmath::Vector4<f32> {
+        pub fn z(self) -> cgmath::Vector4<f32> {
             let (Scalar { s: x }, Scalar { s: y }, Scalar { s: z }, Scalar { s: w }) =
                 rotor_z(self);
             cgmath::Vector4 { x, y, z, w }
         }
 
         #[inline]
-        pub fn ana(self) -> cgmath::Vector4<f32> {
+        pub fn w(self) -> cgmath::Vector4<f32> {
             let (Scalar { s: x }, Scalar { s: y }, Scalar { s: z }, Scalar { s: w }) =
                 rotor_w(self);
             cgmath::Vector4 { x, y, z, w }
@@ -425,23 +425,23 @@ mod impls {
         }
 
         #[inline]
-        pub fn forward(self) -> cgmath::Vector4<f32> {
-            self.rotor_part().forward()
+        pub fn x(self) -> cgmath::Vector4<f32> {
+            self.rotor_part().x()
         }
 
         #[inline]
-        pub fn up(self) -> cgmath::Vector4<f32> {
-            self.rotor_part().up()
+        pub fn y(self) -> cgmath::Vector4<f32> {
+            self.rotor_part().y()
         }
 
         #[inline]
-        pub fn right(self) -> cgmath::Vector4<f32> {
-            self.rotor_part().right()
+        pub fn z(self) -> cgmath::Vector4<f32> {
+            self.rotor_part().z()
         }
 
         #[inline]
-        pub fn ana(self) -> cgmath::Vector4<f32> {
-            self.rotor_part().ana()
+        pub fn w(self) -> cgmath::Vector4<f32> {
+            self.rotor_part().w()
         }
 
         #[inline]
