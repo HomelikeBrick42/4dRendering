@@ -16,6 +16,10 @@ struct App {
     camera: Camera,
 
     xyz_render_target: RenderTarget,
+    xwz_window_open: bool,
+    xwz_render_target: RenderTarget,
+    xyw_window_open: bool,
+    xyw_render_target: RenderTarget,
 }
 
 impl App {
@@ -23,8 +27,6 @@ impl App {
         let eframe::egui_wgpu::RenderState { device, .. } = cc.wgpu_render_state.as_ref().unwrap();
 
         register_rendering_state(cc);
-
-        let xyz_render_target = RenderTarget::new(device, 1, 1);
 
         Self {
             last_time: None,
@@ -39,7 +41,11 @@ impl App {
                 w: 0.0,
             }),
 
-            xyz_render_target,
+            xyz_render_target: RenderTarget::new(device, 1, 1),
+            xwz_window_open: true,
+            xwz_render_target: RenderTarget::new(device, 1, 1),
+            xyw_window_open: true,
+            xyw_render_target: RenderTarget::new(device, 1, 1),
         }
     }
 }
@@ -61,6 +67,8 @@ impl eframe::App for App {
             ui.horizontal(|ui| {
                 self.info_window_open |= ui.button("Info").clicked();
                 self.camera_window_open |= ui.button("Camera").clicked();
+                self.xwz_window_open |= ui.button("XWZ View").clicked();
+                self.xyw_window_open |= ui.button("XYW View").clicked();
             });
         });
 
@@ -111,10 +119,6 @@ impl eframe::App for App {
                 ui.allocate_space(ui.available_size());
             });
 
-        if !ctx.wants_keyboard_input() && !ctx.wants_pointer_input() {
-            ctx.input(|i| self.camera.update(dt, i));
-        }
-
         {
             let callback_resources = &mut renderer.write().callback_resources;
             let render_state: &mut RenderState = callback_resources.get_mut().unwrap();
@@ -139,24 +143,51 @@ impl eframe::App for App {
             );
         }
 
+        if !ctx.wants_keyboard_input() && !ctx.wants_pointer_input() {
+            ctx.input(|i| self.camera.update(dt, i));
+        }
+
+        egui::Window::new("XWZ View")
+            .frame(egui::Frame::window(&ctx.style()).inner_margin(egui::Margin::ZERO))
+            .open(&mut self.xwz_window_open)
+            .resizable(true)
+            .show(ctx, |ui| {
+                ui_render_target(
+                    ui,
+                    device,
+                    &mut self.xwz_render_target,
+                    &self.camera,
+                    ViewAxes::XWZ,
+                    ui.available_size(),
+                );
+            });
+
+        egui::Window::new("XYW View")
+            .frame(egui::Frame::window(&ctx.style()).inner_margin(egui::Margin::ZERO))
+            .open(&mut self.xyw_window_open)
+            .resizable(true)
+            .show(ctx, |ui| {
+                ui_render_target(
+                    ui,
+                    device,
+                    &mut self.xyw_render_target,
+                    &self.camera,
+                    ViewAxes::XYW,
+                    ui.available_size(),
+                );
+            });
+
         egui::CentralPanel::default()
             .frame(egui::Frame::NONE)
             .show(ctx, |ui| {
-                let (rect, _response) =
-                    ui.allocate_exact_size(ui.available_size(), egui::Sense::all());
-
-                self.xyz_render_target
-                    .maybe_resize(device, rect.width() as _, rect.height() as _);
-
-                ui.painter()
-                    .add(eframe::egui_wgpu::Callback::new_paint_callback(
-                        rect,
-                        RenderData {
-                            render_target: self.xyz_render_target.clone(),
-                            camera_transform: self.camera.transform(),
-                            view_axes: ViewAxes::XYZ,
-                        },
-                    ));
+                ui_render_target(
+                    ui,
+                    device,
+                    &mut self.xyz_render_target,
+                    &self.camera,
+                    ViewAxes::XYZ,
+                    ui.available_size(),
+                );
             });
 
         ctx.request_repaint();
@@ -189,6 +220,30 @@ fn main() -> eframe::Result {
         },
         Box::new(|cc| Ok(Box::new(App::new(cc)))),
     )
+}
+
+fn ui_render_target(
+    ui: &mut egui::Ui,
+    device: &wgpu::Device,
+    render_target: &mut RenderTarget,
+    camera: &Camera,
+    view_axes: ViewAxes,
+    size: egui::Vec2,
+) -> egui::Response {
+    let (rect, response) = ui.allocate_exact_size(size, egui::Sense::all());
+
+    render_target.maybe_resize(device, rect.width() as _, rect.height() as _);
+    ui.painter()
+        .add(eframe::egui_wgpu::Callback::new_paint_callback(
+            rect,
+            RenderData {
+                render_target: render_target.clone(),
+                camera_transform: camera.transform(),
+                view_axes,
+            },
+        ));
+
+    response
 }
 
 fn ui_vector4(
