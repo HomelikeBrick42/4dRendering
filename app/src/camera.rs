@@ -40,11 +40,10 @@ impl Camera {
         }
 
         {
-            let rotation = self.rotation();
-            let forward = rotation.x();
-            let up = rotation.y();
-            let right = rotation.z();
-            let ana = rotation.w();
+            let forward = self.main_rotation.x();
+            let up = self.main_rotation.y();
+            let right = self.main_rotation.z();
+            let ana = self.main_rotation.w();
 
             if i.key_down(egui::Key::W) {
                 self.position += forward * move_speed * ts;
