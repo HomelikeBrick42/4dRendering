@@ -3,7 +3,7 @@ pub mod camera;
 use crate::camera::Camera;
 use eframe::{egui, wgpu};
 use rendering::{
-    HyperSphere, RenderData, RenderState, RenderTarget, ViewAxes, register_rendering_state,
+    RenderData, RenderState, RenderTarget, ViewAxes, objects::Hypersphere, register_rendering_state,
 };
 use std::{sync::Arc, time::Instant};
 
@@ -128,10 +128,10 @@ impl eframe::App for App {
             let callback_resources = &mut renderer.write().callback_resources;
             let render_state: &mut RenderState = callback_resources.get_mut().unwrap();
 
-            render_state.update_hyper_spheres(
+            render_state.update_hyperspheres(
                 device,
                 queue,
-                &[HyperSphere {
+                &[Hypersphere {
                     position: cgmath::Vector4 {
                         x: 0.0,
                         y: 0.0,

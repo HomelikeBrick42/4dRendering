@@ -11,20 +11,20 @@ var<push_constant> camera: Camera;
 var output_texture: texture_storage_2d<rgba32float, write>;
 
 struct SceneInfo {
-    hyper_spheres_count: u32,
+    hyperspheres_count: u32,
 }
 
 @group(1) @binding(0)
 var<uniform> info: SceneInfo;
 
-struct HyperSphere {
+struct Hypersphere {
     position: vec4<f32>,
     color: vec3<f32>,
     radius: f32,
 }
 
 @group(2) @binding(0)
-var<storage, read> hyper_spheres: array<HyperSphere>;
+var<storage, read> hyperspheres: array<Hypersphere>;
 
 struct Ray {
     origin: vec4<f32>,
@@ -39,7 +39,7 @@ struct Hit {
     color: vec3<f32>,
 }
 
-fn intersect_hyper_sphere(ray: Ray, hyper_sphere: HyperSphere) -> Hit {
+fn intersect_hypersphere(ray: Ray, hyper_sphere: Hypersphere) -> Hit {
     var hit: Hit;
     hit.hit = false;
 
@@ -67,8 +67,8 @@ fn intersect_scene(ray: Ray) -> Hit {
     var closest_hit: Hit;
     closest_hit.hit = false;
 
-    for (var i = 0u; i < info.hyper_spheres_count; i++) {
-        let hit = intersect_hyper_sphere(ray, hyper_spheres[i]);
+    for (var i = 0u; i < info.hyperspheres_count; i++) {
+        let hit = intersect_hypersphere(ray, hyperspheres[i]);
         if hit.hit && (!closest_hit.hit || hit.distance < closest_hit.distance) {
             closest_hit = hit;
         }

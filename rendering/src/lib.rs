@@ -1,7 +1,9 @@
+pub mod objects;
 mod render_target;
 
 pub use render_target::RenderTarget;
 
+use crate::objects::Hypersphere;
 use eframe::{egui, wgpu};
 use math::Transform;
 use std::mem::offset_of;
@@ -21,27 +23,16 @@ unsafe impl bytemuck::Pod for Camera {}
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 struct SceneInfo {
-    hyper_sphere_count: u32,
+    hypersphere_count: u32,
 }
-
-#[derive(Debug, Clone, Copy)]
-#[repr(C)]
-pub struct HyperSphere {
-    pub position: cgmath::Vector4<f32>,
-    pub color: cgmath::Vector3<f32>,
-    pub radius: f32,
-}
-
-unsafe impl bytemuck::Zeroable for HyperSphere {}
-unsafe impl bytemuck::Pod for HyperSphere {}
 
 pub struct RenderState {
     scene_info_buffer: wgpu::Buffer,
     scene_info_bind_group: wgpu::BindGroup,
 
-    hyper_spheres_bind_group_layout: wgpu::BindGroupLayout,
-    hyper_spheres_buffer: wgpu::Buffer,
-    hyper_spheres_bind_group: wgpu::BindGroup,
+    hyperspheres_buffer: wgpu::Buffer,
+    objects_bind_group_layout: wgpu::BindGroupLayout,
+    objects_bind_group: wgpu::BindGroup,
 
     ray_tracing_compute_pipeline: wgpu::ComputePipeline,
     full_screen_quad_render_pipeline: wgpu::RenderPipeline,
@@ -84,9 +75,11 @@ pub fn register_rendering_state(cc: &eframe::CreationContext<'_>) {
         }],
     });
 
-    let hyper_spheres_bind_group_layout =
+    let hyperspheres_buffer = hyperspheres_buffer(device, 0);
+
+    let objects_bind_group_layout =
         device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Hyper Spheres Bind Group Layout"),
+            label: Some("Objects Bind Group Layout"),
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
                 visibility: wgpu::ShaderStages::COMPUTE,
@@ -98,12 +91,8 @@ pub fn register_rendering_state(cc: &eframe::CreationContext<'_>) {
                 count: None,
             }],
         });
-    let hyper_spheres_buffer = hyper_spheres_buffer(device, 0);
-    let hyper_spheres_bind_group = hyper_spheres_bind_group(
-        device,
-        &hyper_spheres_bind_group_layout,
-        &hyper_spheres_buffer,
-    );
+    let objects_bind_group =
+        objects_bind_group(device, &objects_bind_group_layout, &hyperspheres_buffer);
 
     let ray_tracing_shader =
         device.create_shader_module(wgpu::include_wgsl!("../shaders/ray_tracing.wgsl"));
@@ -113,7 +102,7 @@ pub fn register_rendering_state(cc: &eframe::CreationContext<'_>) {
             bind_group_layouts: &[
                 &render_target::write_bind_group_layout(device),
                 &scene_info_bind_group_layout,
-                &hyper_spheres_bind_group_layout,
+                &objects_bind_group_layout,
             ],
             push_constant_ranges: &[wgpu::PushConstantRange {
                 stages: wgpu::ShaderStages::COMPUTE,
@@ -181,19 +170,19 @@ pub fn register_rendering_state(cc: &eframe::CreationContext<'_>) {
         scene_info_buffer,
         scene_info_bind_group,
 
-        hyper_spheres_bind_group_layout,
-        hyper_spheres_buffer,
-        hyper_spheres_bind_group,
+        objects_bind_group_layout,
+        hyperspheres_buffer,
+        objects_bind_group,
 
         ray_tracing_compute_pipeline,
         full_screen_quad_render_pipeline,
     });
 }
 
-fn hyper_spheres_buffer(device: &wgpu::Device, length: usize) -> wgpu::Buffer {
+fn hyperspheres_buffer(device: &wgpu::Device, length: usize) -> wgpu::Buffer {
     device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("Hyper Spheres Buffer"),
-        size: (length.max(1) * size_of::<HyperSphere>())
+        label: Some("Hyperspheres Buffer"),
+        size: (length.max(1) * size_of::<Hypersphere>())
             .try_into()
             .unwrap(),
         usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
@@ -201,47 +190,46 @@ fn hyper_spheres_buffer(device: &wgpu::Device, length: usize) -> wgpu::Buffer {
     })
 }
 
-fn hyper_spheres_bind_group(
+fn objects_bind_group(
     device: &wgpu::Device,
-    hyper_spheres_bind_group_layout: &wgpu::BindGroupLayout,
-    hyper_spheres_buffer: &wgpu::Buffer,
+    objects_bind_group_layout: &wgpu::BindGroupLayout,
+    hyperspheres_buffer: &wgpu::Buffer,
 ) -> wgpu::BindGroup {
     device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: Some("Hyper Spheres Bind Group"),
-        layout: hyper_spheres_bind_group_layout,
+        label: Some("Objects Bind Group"),
+        layout: objects_bind_group_layout,
         entries: &[wgpu::BindGroupEntry {
             binding: 0,
-            resource: hyper_spheres_buffer.as_entire_binding(),
+            resource: hyperspheres_buffer.as_entire_binding(),
         }],
     })
 }
 
 impl RenderState {
-    pub fn update_hyper_spheres(
+    pub fn update_hyperspheres(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        hyper_spheres: &[HyperSphere],
+        hyperspheres: &[Hypersphere],
     ) {
-        if size_of_val(hyper_spheres) > self.hyper_spheres_buffer.size() as _ {
-            self.hyper_spheres_buffer = hyper_spheres_buffer(device, hyper_spheres.len());
-            self.hyper_spheres_bind_group = hyper_spheres_bind_group(
+        if size_of_val(hyperspheres) > self.hyperspheres_buffer.size() as _ {
+            self.hyperspheres_buffer = hyperspheres_buffer(device, hyperspheres.len());
+            self.objects_bind_group = objects_bind_group(
                 device,
-                &self.hyper_spheres_bind_group_layout,
-                &self.hyper_spheres_buffer,
+                &self.objects_bind_group_layout,
+                &self.hyperspheres_buffer,
             );
         }
         queue.write_buffer(
-            &self.hyper_spheres_buffer,
+            &self.hyperspheres_buffer,
             0,
-            bytemuck::cast_slice(hyper_spheres),
+            bytemuck::cast_slice(hyperspheres),
         );
         queue.write_buffer(
             &self.scene_info_buffer,
-            offset_of!(SceneInfo, hyper_sphere_count) as _,
-            &u32::to_ne_bytes(hyper_spheres.len().try_into().unwrap()),
+            offset_of!(SceneInfo, hypersphere_count) as _,
+            &u32::to_ne_bytes(hyperspheres.len().try_into().unwrap()),
         );
-        queue.submit(std::iter::empty());
     }
 }
 
@@ -281,7 +269,7 @@ impl eframe::egui_wgpu::CallbackTrait for RenderData {
             compute_pass.set_pipeline(&state.ray_tracing_compute_pipeline);
             compute_pass.set_bind_group(0, &self.render_target.write_bind_group, &[]);
             compute_pass.set_bind_group(1, &state.scene_info_bind_group, &[]);
-            compute_pass.set_bind_group(2, &state.hyper_spheres_bind_group, &[]);
+            compute_pass.set_bind_group(2, &state.objects_bind_group, &[]);
 
             let camera = {
                 let x = self.camera_transform.x();
