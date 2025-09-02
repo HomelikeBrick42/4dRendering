@@ -2,8 +2,11 @@ pub mod camera;
 
 use crate::camera::Camera;
 use eframe::{egui, wgpu};
+use math::Transform;
 use rendering::{
-    RenderData, RenderState, RenderTarget, ViewAxes, objects::Hypersphere, register_rendering_state,
+    RenderData, RenderState, RenderTarget, ViewAxes,
+    objects::{Hyperplane, Hypersphere},
+    register_rendering_state,
 };
 use std::{sync::Arc, time::Instant};
 
@@ -36,7 +39,7 @@ impl App {
             camera_window_open: true,
             camera: Camera::new(cgmath::Vector4 {
                 x: -3.0,
-                y: 0.0,
+                y: 1.0,
                 z: 0.0,
                 w: 0.0,
             }),
@@ -134,7 +137,7 @@ impl eframe::App for App {
                 &[Hypersphere {
                     position: cgmath::Vector4 {
                         x: 0.0,
-                        y: 0.0,
+                        y: 1.0,
                         z: 0.0,
                         w: 0.0,
                     },
@@ -144,6 +147,22 @@ impl eframe::App for App {
                         z: 0.0,
                     },
                     radius: 1.0,
+                }],
+            );
+            render_state.update_hyperplanees(
+                device,
+                queue,
+                &[Hyperplane {
+                    transform: Transform::identity(),
+                    color: cgmath::Vector3 {
+                        x: 0.2,
+                        y: 0.8,
+                        z: 0.3,
+                    },
+                    width: 5.0,
+                    height: 5.0,
+                    depth: 5.0,
+                    _padding: Default::default(),
                 }],
             );
         }

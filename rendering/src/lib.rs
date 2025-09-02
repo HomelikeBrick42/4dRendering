@@ -3,7 +3,7 @@ mod render_target;
 
 pub use render_target::RenderTarget;
 
-use crate::objects::Hypersphere;
+use crate::objects::{Hyperplane, Hypersphere};
 use eframe::{egui, wgpu};
 use math::Transform;
 use std::mem::offset_of;
@@ -23,7 +23,8 @@ unsafe impl bytemuck::Pod for Camera {}
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 struct SceneInfo {
-    hypersphere_count: u32,
+    hyperspheres_count: u32,
+    hyperplanes_count: u32,
 }
 
 pub struct RenderState {
@@ -31,6 +32,7 @@ pub struct RenderState {
     scene_info_bind_group: wgpu::BindGroup,
 
     hyperspheres_buffer: wgpu::Buffer,
+    hyperplanes_buffer: wgpu::Buffer,
     objects_bind_group_layout: wgpu::BindGroupLayout,
     objects_bind_group: wgpu::BindGroup,
 
@@ -76,23 +78,40 @@ pub fn register_rendering_state(cc: &eframe::CreationContext<'_>) {
     });
 
     let hyperspheres_buffer = hyperspheres_buffer(device, 0);
+    let hyperplanes_buffer = hyperplanes_buffer(device, 0);
 
     let objects_bind_group_layout =
         device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Objects Bind Group Layout"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::COMPUTE,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Storage { read_only: true },
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
                 },
-                count: None,
-            }],
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ],
         });
-    let objects_bind_group =
-        objects_bind_group(device, &objects_bind_group_layout, &hyperspheres_buffer);
+    let objects_bind_group = objects_bind_group(
+        device,
+        &objects_bind_group_layout,
+        &hyperspheres_buffer,
+        &hyperplanes_buffer,
+    );
 
     let ray_tracing_shader =
         device.create_shader_module(wgpu::include_wgsl!("../shaders/ray_tracing.wgsl"));
@@ -170,8 +189,9 @@ pub fn register_rendering_state(cc: &eframe::CreationContext<'_>) {
         scene_info_buffer,
         scene_info_bind_group,
 
-        objects_bind_group_layout,
         hyperspheres_buffer,
+        hyperplanes_buffer,
+        objects_bind_group_layout,
         objects_bind_group,
 
         ray_tracing_compute_pipeline,
@@ -190,18 +210,36 @@ fn hyperspheres_buffer(device: &wgpu::Device, length: usize) -> wgpu::Buffer {
     })
 }
 
+fn hyperplanes_buffer(device: &wgpu::Device, length: usize) -> wgpu::Buffer {
+    device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("Hyperplanes Buffer"),
+        size: (length.max(1) * size_of::<Hyperplane>())
+            .try_into()
+            .unwrap(),
+        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    })
+}
+
 fn objects_bind_group(
     device: &wgpu::Device,
     objects_bind_group_layout: &wgpu::BindGroupLayout,
     hyperspheres_buffer: &wgpu::Buffer,
+    hyperplanes_buffer: &wgpu::Buffer,
 ) -> wgpu::BindGroup {
     device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("Objects Bind Group"),
         layout: objects_bind_group_layout,
-        entries: &[wgpu::BindGroupEntry {
-            binding: 0,
-            resource: hyperspheres_buffer.as_entire_binding(),
-        }],
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: hyperspheres_buffer.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: hyperplanes_buffer.as_entire_binding(),
+            },
+        ],
     })
 }
 
@@ -218,6 +256,7 @@ impl RenderState {
                 device,
                 &self.objects_bind_group_layout,
                 &self.hyperspheres_buffer,
+                &self.hyperplanes_buffer,
             );
         }
         queue.write_buffer(
@@ -227,8 +266,35 @@ impl RenderState {
         );
         queue.write_buffer(
             &self.scene_info_buffer,
-            offset_of!(SceneInfo, hypersphere_count) as _,
+            offset_of!(SceneInfo, hyperspheres_count) as _,
             &u32::to_ne_bytes(hyperspheres.len().try_into().unwrap()),
+        );
+    }
+
+    pub fn update_hyperplanees(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        hyperplanes: &[Hyperplane],
+    ) {
+        if size_of_val(hyperplanes) > self.hyperplanes_buffer.size() as _ {
+            self.hyperplanes_buffer = hyperplanes_buffer(device, hyperplanes.len());
+            self.objects_bind_group = objects_bind_group(
+                device,
+                &self.objects_bind_group_layout,
+                &self.hyperspheres_buffer,
+                &self.hyperplanes_buffer,
+            );
+        }
+        queue.write_buffer(
+            &self.hyperplanes_buffer,
+            0,
+            bytemuck::cast_slice(hyperplanes),
+        );
+        queue.write_buffer(
+            &self.scene_info_buffer,
+            offset_of!(SceneInfo, hyperplanes_count) as _,
+            &u32::to_ne_bytes(hyperplanes.len().try_into().unwrap()),
         );
     }
 }
