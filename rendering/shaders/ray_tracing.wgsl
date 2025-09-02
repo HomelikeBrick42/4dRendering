@@ -86,7 +86,13 @@ fn sky_color(ray: Ray) -> vec3<f32> {
 fn trace_ray(ray: Ray) -> vec3<f32> {
     let hit = intersect_scene(ray);
     if hit.hit {
-        return hit.color * max(0.1, dot(hit.normal, normalize(vec4<f32>(0.1, 1.0, 0.3, 0.4))));
+        var sun_ray: Ray;
+        sun_ray.origin = hit.position + hit.normal * 0.001;
+        sun_ray.direction = normalize(vec4<f32>(- 0.1, 1.0, 0.3, 0.4));
+
+        let sun_hit = intersect_scene(sun_ray);
+
+        return hit.color * max(0.1, f32(!sun_hit.hit) * dot(hit.normal, sun_ray.direction));
     }
     else {
         return sky_color(ray);
