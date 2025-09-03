@@ -20,7 +20,6 @@ struct UISettings {
     camera_window_open: bool,
     xwz_window_open: bool,
     xyw_window_open: bool,
-    objects_window_open: bool,
     objects_view: ObjectsView,
 }
 
@@ -37,7 +36,6 @@ impl Default for UISettings {
             camera_window_open: true,
             xwz_window_open: true,
             xyw_window_open: true,
-            objects_window_open: true,
             objects_view: ObjectsView::Grouped,
         }
     }
@@ -197,8 +195,37 @@ impl eframe::App for App {
                 self.ui_settings.camera_window_open |= ui.button("Camera").clicked();
                 self.ui_settings.xwz_window_open |= ui.button("XWZ View").clicked();
                 self.ui_settings.xyw_window_open |= ui.button("XYW View").clicked();
-                self.ui_settings.objects_window_open |= ui.button("Objects").clicked();
             });
+        });
+
+        egui::SidePanel::left("Objects").show(ctx, |ui| {
+            egui::ScrollArea::both().show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label("View Type:");
+                    egui::ComboBox::new("View Type", "")
+                        .selected_text(match self.ui_settings.objects_view {
+                            ObjectsView::Flat => "Flat",
+                            ObjectsView::Grouped => "Grouped",
+                        })
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(
+                                &mut self.ui_settings.objects_view,
+                                ObjectsView::Flat,
+                                "Flat",
+                            );
+                            ui.selectable_value(
+                                &mut self.ui_settings.objects_view,
+                                ObjectsView::Grouped,
+                                "Grouped",
+                            );
+                        });
+                });
+                match self.ui_settings.objects_view {
+                    ObjectsView::Flat => self.scene.objects.flat_ui(ui),
+                    ObjectsView::Grouped => self.scene.objects.grouped_ui(ui),
+                }
+            });
+            ui.allocate_space(ui.available_size());
         });
 
         self.file_dialog.update(ctx);
@@ -315,37 +342,6 @@ impl eframe::App for App {
                         ui_vector4(ui, &mut transform.w());
                     });
                 });
-                ui.allocate_space(ui.available_size());
-            });
-
-        egui::Window::new("Objects")
-            .open(&mut self.ui_settings.objects_window_open)
-            .scroll(true)
-            .show(ctx, |ui| {
-                ui.horizontal(|ui| {
-                    ui.label("View Type:");
-                    egui::ComboBox::new("View Type", "")
-                        .selected_text(match self.ui_settings.objects_view {
-                            ObjectsView::Flat => "Flat",
-                            ObjectsView::Grouped => "Grouped",
-                        })
-                        .show_ui(ui, |ui| {
-                            ui.selectable_value(
-                                &mut self.ui_settings.objects_view,
-                                ObjectsView::Flat,
-                                "Flat",
-                            );
-                            ui.selectable_value(
-                                &mut self.ui_settings.objects_view,
-                                ObjectsView::Grouped,
-                                "Grouped",
-                            );
-                        });
-                });
-                match self.ui_settings.objects_view {
-                    ObjectsView::Flat => self.scene.objects.flat_ui(ui),
-                    ObjectsView::Grouped => self.scene.objects.grouped_ui(ui),
-                }
                 ui.allocate_space(ui.available_size());
             });
 
