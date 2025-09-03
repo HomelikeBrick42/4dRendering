@@ -219,6 +219,7 @@ impl Objects {
             if ui.button("New Hypersphere").clicked() {
                 new_id = Some(self.hyperspheres.insert(Hypersphere::default()));
             }
+            let mut to_insert = vec![];
             let mut to_delete = vec![];
             let ids = self.hyperspheres.keys().collect::<Vec<_>>();
             Self::hyperspheres_ui(
@@ -227,10 +228,14 @@ impl Objects {
                 &mut self.hyperspheres,
                 ids.into_iter(),
                 new_id,
+                &mut to_insert,
                 &mut to_delete,
             );
             for id in to_delete {
                 self.hyperspheres.remove(id);
+            }
+            for hypersphere in to_insert {
+                self.hyperspheres.insert(hypersphere);
             }
         });
         ui.collapsing("Hyperplanes", |ui| {
@@ -238,6 +243,7 @@ impl Objects {
             if ui.button("New Hyperplane").clicked() {
                 new_id = Some(self.hyperplanes.insert(Hyperplane::default()));
             }
+            let mut to_insert = vec![];
             let mut to_delete = vec![];
             let ids = self.hyperplanes.keys().collect::<Vec<_>>();
             Self::hyperplanes_ui(
@@ -246,10 +252,14 @@ impl Objects {
                 &mut self.hyperplanes,
                 ids.into_iter(),
                 new_id,
+                &mut to_insert,
                 &mut to_delete,
             );
             for id in to_delete {
                 self.hyperplanes.remove(id);
+            }
+            for hyperplane in to_insert {
+                self.hyperplanes.insert(hyperplane);
             }
         });
         self.cleanup_invalid_ids();
@@ -266,12 +276,14 @@ impl Objects {
         if ui.button("New Hypersphere").clicked() {
             new_hypersphere_id = Some(self.hyperspheres.insert(Hypersphere::default()));
         }
+        let mut hyperspheres_to_insert = vec![];
         let mut hyperspheres_to_delete = vec![];
 
         let mut new_hyperplane_id = None;
         if ui.button("New Hyperplane").clicked() {
             new_hyperplane_id = Some(self.hyperplanes.insert(Hyperplane::default()));
         }
+        let mut hyperplanes_to_insert = vec![];
         let mut hyperplanes_to_delete = vec![];
 
         #[derive(Default)]
@@ -298,7 +310,9 @@ impl Objects {
                 .push(id);
         }
 
-        for (id, grouped_objects) in grouped_objects {
+        let mut groups_to_clone = vec![];
+
+        for (&id, grouped_objects) in &grouped_objects {
             let response = egui::CollapsingHeader::new(if let Some(group_id) = id {
                 if let Some(group) = self.groups.get(group_id) {
                     &group.name
@@ -320,6 +334,9 @@ impl Objects {
                     ui.collapsing("Transform", |ui| {
                         group.transform.ui(ui);
                     });
+                    if ui.button("Clone").clicked() {
+                        groups_to_clone.push(group_id);
+                    }
                     if ui.button("Delete").clicked() {
                         groups_to_delete.push(group_id);
                     }
@@ -331,6 +348,7 @@ impl Objects {
                         &mut self.hyperspheres,
                         grouped_objects.hyperspheres.iter().copied(),
                         new_hypersphere_id,
+                        &mut hyperspheres_to_insert,
                         &mut hyperspheres_to_delete,
                     );
                 });
@@ -341,6 +359,7 @@ impl Objects {
                         &mut self.hyperplanes,
                         grouped_objects.hyperplanes.iter().copied(),
                         new_hyperplane_id,
+                        &mut hyperplanes_to_insert,
                         &mut hyperplanes_to_delete,
                     );
                 });
@@ -353,14 +372,59 @@ impl Objects {
             }
         }
 
+        for id in groups_to_clone {
+            let mut new_group = self.groups[id].clone();
+            new_group.name += " Clone";
+            let new_id = self.groups.insert(new_group);
+
+            let new_hyperspheres = self
+                .hyperspheres
+                .values()
+                .filter(|hypersphere| hypersphere.group == Some(id))
+                .map(|hypersphere| {
+                    let mut new_hypersphere = hypersphere.clone();
+                    new_hypersphere.group = Some(new_id);
+                    new_hypersphere
+                })
+                .collect::<Vec<_>>();
+            for hypersphere in new_hyperspheres {
+                self.hyperspheres.insert(hypersphere);
+            }
+
+            let new_hyperplanes = self
+                .hyperplanes
+                .values()
+                .filter(|hyperplane| hyperplane.group == Some(id))
+                .map(|hyperplane| {
+                    let mut new_hyperplane = hyperplane.clone();
+                    new_hyperplane.group = Some(new_id);
+                    new_hyperplane
+                })
+                .collect::<Vec<_>>();
+            for hypersphere in new_hyperplanes {
+                self.hyperplanes.insert(hypersphere);
+            }
+        }
+
         for id in groups_to_delete {
             self.groups.remove(id);
+            self.hyperspheres
+                .retain(|_, hypersphere| hypersphere.group != Some(id));
+            self.hyperplanes
+                .retain(|_, hyperplane| hyperplane.group != Some(id));
         }
         for id in hyperspheres_to_delete {
             self.hyperspheres.remove(id);
         }
         for id in hyperplanes_to_delete {
             self.hyperplanes.remove(id);
+        }
+
+        for hypersphere in hyperspheres_to_insert {
+            self.hyperspheres.insert(hypersphere);
+        }
+        for hyperplane in hyperplanes_to_insert {
+            self.hyperplanes.insert(hyperplane);
         }
 
         self.cleanup_invalid_ids();
@@ -411,6 +475,7 @@ impl Objects {
         hyperspheres: &mut SlotMap<HypersphereID, Hypersphere>,
         hypersphere_ids: impl Iterator<Item = HypersphereID>,
         scroll_to_id: Option<HypersphereID>,
+        to_insert: &mut Vec<Hypersphere>,
         to_delete: &mut Vec<HypersphereID>,
     ) {
         for id in hypersphere_ids {
@@ -434,6 +499,11 @@ impl Objects {
                     ui.label("Color:");
                     ui.color_edit_button_rgb(hypersphere.color.as_mut());
                 });
+                if ui.button("Clone").clicked() {
+                    let mut new_hypersphere = hypersphere.clone();
+                    new_hypersphere.name += " Cloned";
+                    to_insert.push(new_hypersphere);
+                }
                 if ui.button("Delete").clicked() {
                     to_delete.push(id);
                 }
@@ -450,6 +520,7 @@ impl Objects {
         hyperplanes: &mut SlotMap<HyperplaneID, Hyperplane>,
         hyperplane_ids: impl Iterator<Item = HyperplaneID>,
         scroll_to_id: Option<HyperplaneID>,
+        to_insert: &mut Vec<Hyperplane>,
         to_delete: &mut Vec<HyperplaneID>,
     ) {
         for id in hyperplane_ids {
@@ -481,6 +552,11 @@ impl Objects {
                     ui.label("Color:");
                     ui.color_edit_button_rgb(hyperplane.color.as_mut());
                 });
+                if ui.button("Clone").clicked() {
+                    let mut new_hyperplane = hyperplane.clone();
+                    new_hyperplane.name += " Clone";
+                    to_insert.push(new_hyperplane);
+                }
                 if ui.button("Delete").clicked() {
                     to_delete.push(id);
                 }

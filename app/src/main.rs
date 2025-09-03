@@ -38,7 +38,7 @@ impl Default for UISettings {
             xwz_window_open: true,
             xyw_window_open: true,
             objects_window_open: true,
-            objects_view: ObjectsView::Flat,
+            objects_view: ObjectsView::Grouped,
         }
     }
 }
