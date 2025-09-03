@@ -3,7 +3,7 @@ use math::Transform;
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct Hypersphere {
-    pub position: cgmath::Vector4<f32>,
+    pub transform: Transform,
     pub color: cgmath::Vector3<f32>,
     pub radius: f32,
 }

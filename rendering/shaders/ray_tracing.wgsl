@@ -19,7 +19,7 @@ struct SceneInfo {
 var<uniform> info: SceneInfo;
 
 struct Hypersphere {
-    position: vec4<f32>,
+    transform: Transform,
     color: vec3<f32>,
     radius: f32,
 }
@@ -55,7 +55,9 @@ fn intersect_hypersphere(ray: Ray, hypersphere: Hypersphere) -> Hit {
     var hit: Hit;
     hit.hit = false;
 
-    let oc = hypersphere.position - ray.origin;
+    let position = transform_position(hypersphere.transform);
+
+    let oc = position - ray.origin;
     // TODO: can this be replaced with 1?
     let a = dot(ray.direction, ray.direction);
     let h = dot(ray.direction, oc);
@@ -67,7 +69,7 @@ fn intersect_hypersphere(ray: Ray, hypersphere: Hypersphere) -> Hit {
         if hit.distance > 0.0 {
             hit.hit = true;
             hit.position = ray.origin + ray.direction * hit.distance;
-            hit.normal = (hit.position - hypersphere.position) / hypersphere.radius;
+            hit.normal = (hit.position - position) / hypersphere.radius;
             hit.color = hypersphere.color;
         }
     }
@@ -280,6 +282,32 @@ fn transform_direction(transform: Transform, direction: vec4<f32>) -> vec4<f32> 
     result.y = (_9) + (- 2.0 * _0 * _10 * _4) + (- 2.0 * _0 * _11 * _5) + (- 2.0 * _1 * _1 * _9) + (- 2.0 * _1 * _10 * _2) + (- 2.0 * _1 * _11 * _3) + (- 2.0 * _10 * _3 * _7) + (- 2.0 * _10 * _5 * _6) + (- 2.0 * _2 * _4 * _8) + (- 2.0 * _3 * _5 * _8) + (- 2.0 * _4 * _4 * _9) + (- 2.0 * _5 * _5 * _9) + (- 2.0 * _7 * _7 * _9) + (2.0 * _0 * _1 * _8) + (2.0 * _11 * _2 * _7) + (2.0 * _11 * _4 * _6) + (2.0 * _6 * _7 * _8);
     result.z = (_10) + (- 2.0 * _0 * _11 * _6) + (- 2.0 * _1 * _11 * _7) + (- 2.0 * _1 * _2 * _9) + (- 2.0 * _10 * _2 * _2) + (- 2.0 * _10 * _4 * _4) + (- 2.0 * _10 * _6 * _6) + (- 2.0 * _10 * _7 * _7) + (- 2.0 * _11 * _2 * _3) + (- 2.0 * _11 * _4 * _5) + (- 2.0 * _3 * _6 * _8) + (- 2.0 * _5 * _6 * _9) + (- 2.0 * _5 * _7 * _8) + (2.0 * _0 * _2 * _8) + (2.0 * _0 * _4 * _9) + (2.0 * _1 * _4 * _8) + (2.0 * _3 * _7 * _9);
     result.w = (_11) + (- 2.0 * _1 * _3 * _9) + (- 2.0 * _10 * _2 * _3) + (- 2.0 * _10 * _4 * _5) + (- 2.0 * _11 * _3 * _3) + (- 2.0 * _11 * _5 * _5) + (- 2.0 * _11 * _6 * _6) + (- 2.0 * _11 * _7 * _7) + (- 2.0 * _2 * _7 * _9) + (2.0 * _0 * _10 * _6) + (2.0 * _0 * _3 * _8) + (2.0 * _0 * _5 * _9) + (2.0 * _1 * _10 * _7) + (2.0 * _1 * _5 * _8) + (2.0 * _2 * _6 * _8) + (2.0 * _4 * _6 * _9) + (2.0 * _4 * _7 * _8);
+    return result;
+}
+
+fn transform_position(transform: Transform) -> vec4<f32> {
+
+    let _0 = transform.s;
+    let _1 = transform.e0e1;
+    let _2 = transform.e0e2;
+    let _3 = transform.e0e3;
+    let _4 = transform.e0e4;
+    let _5 = transform.e1e2;
+    let _6 = transform.e1e3;
+    let _7 = transform.e1e4;
+    let _8 = transform.e2e3;
+    let _9 = transform.e2e4;
+    let _10 = transform.e3e4;
+    let _11 = transform.e0e1e2e3;
+    let _12 = transform.e0e1e2e4;
+    let _13 = transform.e0e1e3e4;
+    let _14 = transform.e0e2e3e4;
+    let _15 = transform.e1e2e3e4;
+    var result: vec4<f32>;
+    result.x = (- 2.0 * _14 * _15) + (- 2.0 * _2 * _5) + (- 2.0 * _3 * _6) + (- 2.0 * _4 * _7) + (2.0 * _0 * _1) + (2.0 * _10 * _13) + (2.0 * _11 * _8) + (2.0 * _12 * _9);
+    result.y = (- 2.0 * _11 * _6) + (- 2.0 * _12 * _7) + (- 2.0 * _3 * _8) + (- 2.0 * _4 * _9) + (2.0 * _0 * _2) + (2.0 * _1 * _5) + (2.0 * _10 * _14) + (2.0 * _13 * _15);
+    result.z = (- 2.0 * _10 * _4) + (- 2.0 * _12 * _15) + (- 2.0 * _13 * _7) + (- 2.0 * _14 * _9) + (2.0 * _0 * _3) + (2.0 * _1 * _6) + (2.0 * _11 * _5) + (2.0 * _2 * _8);
+    result.w = (2.0 * _0 * _4) + (2.0 * _1 * _7) + (2.0 * _10 * _3) + (2.0 * _11 * _15) + (2.0 * _12 * _5) + (2.0 * _13 * _6) + (2.0 * _14 * _8) + (2.0 * _2 * _9);
     return result;
 }
 

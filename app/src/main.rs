@@ -35,17 +35,21 @@ impl App {
         register_rendering_state(cc);
 
         let mut objects = Objects {
+            group_transforms: SlotMap::with_key(),
             hyperspheres: SlotMap::with_key(),
             hyperplanes: SlotMap::with_key(),
         };
 
         objects.hyperspheres.insert(Hypersphere {
             name: "Red".into(),
-            position: cgmath::Vector4 {
-                x: 0.0,
-                y: 1.0,
-                z: 0.0,
-                w: 0.0,
+            group: None,
+            transform: objects::Transform {
+                position: cgmath::Vector4 {
+                    x: 0.0,
+                    y: 1.0,
+                    z: 0.0,
+                    w: 0.0,
+                },
             },
             color: cgmath::Vector3 {
                 x: 1.0,
@@ -56,11 +60,14 @@ impl App {
         });
         objects.hyperplanes.insert(Hyperplane {
             name: "Ground".into(),
-            position: cgmath::Vector4 {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-                w: 0.0,
+            group: None,
+            transform: objects::Transform {
+                position: cgmath::Vector4 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
+                    w: 0.0,
+                },
             },
             width: 5.0,
             height: 5.0,
@@ -201,22 +208,12 @@ impl eframe::App for App {
             render_state.update_hyperspheres(
                 device,
                 queue,
-                &self
-                    .objects
-                    .hyperspheres
-                    .values()
-                    .map(Hypersphere::to_gpu_hypersphere)
-                    .collect::<Vec<_>>(),
+                &self.objects.gpu_hyperspheres().collect::<Vec<_>>(),
             );
             render_state.update_hyperplanees(
                 device,
                 queue,
-                &self
-                    .objects
-                    .hyperplanes
-                    .values()
-                    .map(Hyperplane::to_gpu_hyperplane)
-                    .collect::<Vec<_>>(),
+                &self.objects.gpu_hyperplanes().collect::<Vec<_>>(),
             );
         }
 
