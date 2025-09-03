@@ -166,6 +166,23 @@ pub struct Objects {
 }
 
 impl Objects {
+    pub fn cleanup_invalid_ids(&mut self) {
+        for hypersphere in self.hyperspheres.values_mut() {
+            if let Some(group) = hypersphere.group
+                && !self.groups.contains_key(group)
+            {
+                hypersphere.group = None;
+            }
+        }
+        for hyperplane in self.hyperplanes.values_mut() {
+            if let Some(group) = hyperplane.group
+                && !self.groups.contains_key(group)
+            {
+                hyperplane.group = None;
+            }
+        }
+    }
+
     pub fn flat_ui(&mut self, ui: &mut egui::Ui) {
         ui.collapsing("Groups", |ui| {
             let mut new_id = None;
@@ -235,6 +252,7 @@ impl Objects {
                 self.hyperplanes.remove(id);
             }
         });
+        self.cleanup_invalid_ids();
     }
 
     pub fn grouped_ui(&mut self, ui: &mut egui::Ui) {
@@ -344,6 +362,8 @@ impl Objects {
         for id in hyperplanes_to_delete {
             self.hyperplanes.remove(id);
         }
+
+        self.cleanup_invalid_ids();
     }
 
     pub fn gpu_hyperspheres(
