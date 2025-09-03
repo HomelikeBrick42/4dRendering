@@ -105,6 +105,14 @@ impl eframe::App for App {
                     if ui.button("Reset XY Rotation").clicked() {
                         self.camera.xy_rotation = 0.0;
                     }
+                    if ui.button("Rotate to WYZ").clicked() {
+                        self.camera.main_rotation =
+                            self.camera.main_rotation.then(Rotor::rotate_xw(0.25 * TAU));
+                    }
+                    if ui.button("Rotate to XYW").clicked() {
+                        self.camera.main_rotation =
+                            self.camera.main_rotation.then(Rotor::rotate_zw(0.25 * TAU));
+                    }
                     ui.label("These align buttons assume that the current XY rotation is 0");
                     if ui.button("Align XYZ").clicked() {
                         self.camera.main_rotation = Rotor::identity();
