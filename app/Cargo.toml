@@ -8,6 +8,7 @@ cgmath = { workspace = true }
 eframe = { workspace = true }
 math = { workspace = true }
 rendering = { workspace = true }
+slotmap = "1.0.7"
 
 [lints]
 workspace = true

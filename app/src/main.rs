@@ -1,13 +1,14 @@
 pub mod camera;
+pub mod objects;
 
-use crate::camera::Camera;
-use eframe::{egui, wgpu};
-use math::{Rotor, Transform};
-use rendering::{
-    RenderData, RenderState, RenderTarget, ViewAxes,
-    objects::{Hyperplane, Hypersphere},
-    register_rendering_state,
+use crate::{
+    camera::Camera,
+    objects::{Hyperplane, Hypersphere, Objects},
 };
+use eframe::{egui, wgpu};
+use math::Rotor;
+use rendering::{RenderData, RenderState, RenderTarget, ViewAxes, register_rendering_state};
+use slotmap::SlotMap;
 use std::{f32::consts::TAU, sync::Arc, time::Instant};
 
 struct App {
@@ -23,6 +24,8 @@ struct App {
     xwz_render_target: RenderTarget,
     xyw_window_open: bool,
     xyw_render_target: RenderTarget,
+
+    objects: Objects,
 }
 
 impl App {
@@ -30,6 +33,44 @@ impl App {
         let eframe::egui_wgpu::RenderState { device, .. } = cc.wgpu_render_state.as_ref().unwrap();
 
         register_rendering_state(cc);
+
+        let mut objects = Objects {
+            hyperspheres: SlotMap::with_key(),
+            hyperplanes: SlotMap::with_key(),
+        };
+
+        objects.hyperspheres.insert(Hypersphere {
+            name: "Red".into(),
+            position: cgmath::Vector4 {
+                x: 0.0,
+                y: 1.0,
+                z: 0.0,
+                w: 0.0,
+            },
+            color: cgmath::Vector3 {
+                x: 1.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            radius: 1.0,
+        });
+        objects.hyperplanes.insert(Hyperplane {
+            name: "Ground".into(),
+            position: cgmath::Vector4 {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+                w: 0.0,
+            },
+            width: 5.0,
+            height: 5.0,
+            depth: 5.0,
+            color: cgmath::Vector3 {
+                x: 0.2,
+                y: 0.8,
+                z: 0.3,
+            },
+        });
 
         Self {
             last_time: None,
@@ -49,6 +90,8 @@ impl App {
             xwz_render_target: RenderTarget::new(device, 1, 1),
             xyw_window_open: true,
             xyw_render_target: RenderTarget::new(device, 1, 1),
+
+            objects,
         }
     }
 }
@@ -154,39 +197,26 @@ impl eframe::App for App {
             let callback_resources = &mut renderer.write().callback_resources;
             let render_state: &mut RenderState = callback_resources.get_mut().unwrap();
 
+            // TODO: update this so the iterator can be passed directly in, instead of making a new Vec every time
             render_state.update_hyperspheres(
                 device,
                 queue,
-                &[Hypersphere {
-                    position: cgmath::Vector4 {
-                        x: 0.0,
-                        y: 1.0,
-                        z: 0.0,
-                        w: 0.0,
-                    },
-                    color: cgmath::Vector3 {
-                        x: 1.0,
-                        y: 0.0,
-                        z: 0.0,
-                    },
-                    radius: 1.0,
-                }],
+                &self
+                    .objects
+                    .hyperspheres
+                    .values()
+                    .map(Hypersphere::to_gpu_hypersphere)
+                    .collect::<Vec<_>>(),
             );
             render_state.update_hyperplanees(
                 device,
                 queue,
-                &[Hyperplane {
-                    transform: Transform::identity(),
-                    color: cgmath::Vector3 {
-                        x: 0.2,
-                        y: 0.8,
-                        z: 0.3,
-                    },
-                    width: 5.0,
-                    height: 5.0,
-                    depth: 5.0,
-                    _padding: Default::default(),
-                }],
+                &self
+                    .objects
+                    .hyperplanes
+                    .values()
+                    .map(Hyperplane::to_gpu_hyperplane)
+                    .collect::<Vec<_>>(),
             );
         }
 
