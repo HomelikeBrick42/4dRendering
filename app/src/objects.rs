@@ -1,21 +1,78 @@
 use crate::ui_vector4;
 use eframe::egui;
+use math::Rotor;
 use slotmap::{SlotMap, new_key_type};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Transform {
     pub position: cgmath::Vector4<f32>,
+    pub xy_rotation: f32,
+    pub xz_rotation: f32,
+    pub xw_rotation: f32,
+    pub yz_rotation: f32,
+    pub yw_rotation: f32,
+    pub zw_rotation: f32,
+}
+
+impl Default for Transform {
+    fn default() -> Self {
+        Self {
+            position: cgmath::Vector4 {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+                w: 0.0,
+            },
+            xy_rotation: 0.0,
+            xz_rotation: 0.0,
+            xw_rotation: 0.0,
+            yz_rotation: 0.0,
+            yw_rotation: 0.0,
+            zw_rotation: 0.0,
+        }
+    }
 }
 
 impl Transform {
     pub fn transform(&self) -> math::Transform {
-        math::Transform::translation(self.position)
+        math::Transform::translation(self.position).then(math::Transform::from_rotor(
+            Rotor::rotate_xy(self.xy_rotation)
+                .then(Rotor::rotate_xz(self.xz_rotation))
+                .then(Rotor::rotate_xw(self.xw_rotation))
+                .then(Rotor::rotate_yz(self.yz_rotation))
+                .then(Rotor::rotate_yw(self.yw_rotation))
+                .then(Rotor::rotate_zw(self.zw_rotation)),
+        ))
     }
 
     pub fn ui(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.label("Position:");
             ui_vector4(ui, &mut self.position);
+        });
+        ui.horizontal(|ui| {
+            ui.label("XY Rotation:");
+            ui.drag_angle(&mut self.xy_rotation);
+        });
+        ui.horizontal(|ui| {
+            ui.label("XZ Rotation:");
+            ui.drag_angle(&mut self.xz_rotation);
+        });
+        ui.horizontal(|ui| {
+            ui.label("XW Rotation:");
+            ui.drag_angle(&mut self.xw_rotation);
+        });
+        ui.horizontal(|ui| {
+            ui.label("YZ Rotation:");
+            ui.drag_angle(&mut self.yz_rotation);
+        });
+        ui.horizontal(|ui| {
+            ui.label("YW Rotation:");
+            ui.drag_angle(&mut self.yw_rotation);
+        });
+        ui.horizontal(|ui| {
+            ui.label("ZW Rotation:");
+            ui.drag_angle(&mut self.zw_rotation);
         });
     }
 }

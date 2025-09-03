@@ -43,14 +43,7 @@ impl App {
 
         objects.groups.insert(Group {
             name: "Test Group".into(),
-            transform: objects::Transform {
-                position: cgmath::Vector4 {
-                    x: 0.0,
-                    y: 0.0,
-                    z: 0.0,
-                    w: 0.0,
-                },
-            },
+            transform: objects::Transform::default(),
         });
         objects.hyperspheres.insert(Hypersphere {
             name: "Red".into(),
@@ -62,6 +55,7 @@ impl App {
                     z: 0.0,
                     w: 0.0,
                 },
+                ..Default::default()
             },
             color: cgmath::Vector3 {
                 x: 1.0,
@@ -80,6 +74,7 @@ impl App {
                     z: 0.0,
                     w: 0.0,
                 },
+                ..Default::default()
             },
             width: 5.0,
             height: 5.0,
