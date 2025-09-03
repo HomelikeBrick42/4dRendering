@@ -167,23 +167,53 @@ pub struct Objects {
 impl Objects {
     pub fn ui(&mut self, ui: &mut egui::Ui) {
         ui.collapsing("Groups", |ui| {
+            let mut new_id = None;
+            if ui.button("New Group").clicked() {
+                new_id = Some(self.groups.insert(Group::default()));
+            }
+            let mut to_delete = vec![];
             for (id, group) in &mut self.groups {
-                egui::CollapsingHeader::new(&group.name)
-                    .id_salt(id)
-                    .show(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            ui.label("Name:");
-                            ui.text_edit_singleline(&mut group.name);
+                let response =
+                    egui::CollapsingHeader::new(&group.name)
+                        .id_salt(id)
+                        .show(ui, |ui| {
+                            ui.horizontal(|ui| {
+                                ui.label("Name:");
+                                ui.text_edit_singleline(&mut group.name);
+                            });
+                            ui.collapsing("Transform", |ui| {
+                                group.transform.ui(ui);
+                            });
+                            if ui.button("Delete").clicked() {
+                                to_delete.push(id);
+                            }
                         });
-                        ui.collapsing("Transform", |ui| {
-                            group.transform.ui(ui);
-                        });
-                    });
+                if new_id == Some(id) {
+                    ui.scroll_to_rect(response.header_response.rect, Some(egui::Align::TOP));
+                }
+            }
+            for id in to_delete {
+                self.groups.remove(id);
+                for hypersphere in self.hyperspheres.values_mut() {
+                    if hypersphere.group == Some(id) {
+                        hypersphere.group = None;
+                    }
+                }
+                for hyperplane in self.hyperplanes.values_mut() {
+                    if hyperplane.group == Some(id) {
+                        hyperplane.group = None;
+                    }
+                }
             }
         });
         ui.collapsing("Hyperspheres", |ui| {
+            let mut new_id = None;
+            if ui.button("New Hypersphere").clicked() {
+                new_id = Some(self.hyperspheres.insert(Hypersphere::default()));
+            }
+            let mut to_delete = vec![];
             for (id, hypersphere) in &mut self.hyperspheres {
-                egui::CollapsingHeader::new(
+                let response = egui::CollapsingHeader::new(
                     egui::RichText::new(&hypersphere.name).color(color_to_egui(hypersphere.color)),
                 )
                 .id_salt(id)
@@ -207,12 +237,26 @@ impl Objects {
                         ui.label("Color:");
                         ui.color_edit_button_rgb(hypersphere.color.as_mut());
                     });
+                    if ui.button("Delete").clicked() {
+                        to_delete.push(id);
+                    }
                 });
+                if new_id == Some(id) {
+                    ui.scroll_to_rect(response.header_response.rect, Some(egui::Align::TOP));
+                }
+            }
+            for id in to_delete {
+                self.hyperspheres.remove(id);
             }
         });
         ui.collapsing("Hyperplanes", |ui| {
+            let mut new_id = None;
+            if ui.button("New Hyperplane").clicked() {
+                new_id = Some(self.hyperplanes.insert(Hyperplane::default()));
+            }
+            let mut to_delete = vec![];
             for (id, hyperplane) in &mut self.hyperplanes {
-                egui::CollapsingHeader::new(
+                let response = egui::CollapsingHeader::new(
                     egui::RichText::new(&hyperplane.name).color(color_to_egui(hyperplane.color)),
                 )
                 .id_salt(id)
@@ -244,7 +288,16 @@ impl Objects {
                         ui.label("Color:");
                         ui.color_edit_button_rgb(hyperplane.color.as_mut());
                     });
+                    if ui.button("Delete").clicked() {
+                        to_delete.push(id);
+                    }
                 });
+                if new_id == Some(id) {
+                    ui.scroll_to_rect(response.header_response.rect, Some(egui::Align::TOP));
+                }
+            }
+            for id in to_delete {
+                self.hyperplanes.remove(id);
             }
         });
     }
