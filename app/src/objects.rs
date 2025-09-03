@@ -165,7 +165,7 @@ pub struct Objects {
 }
 
 impl Objects {
-    pub fn ui(&mut self, ui: &mut egui::Ui) {
+    pub fn flat_ui(&mut self, ui: &mut egui::Ui) {
         ui.collapsing("Groups", |ui| {
             let mut new_id = None;
             if ui.button("New Group").clicked() {
@@ -212,39 +212,13 @@ impl Objects {
                 new_id = Some(self.hyperspheres.insert(Hypersphere::default()));
             }
             let mut to_delete = vec![];
-            for (id, hypersphere) in &mut self.hyperspheres {
-                let response = egui::CollapsingHeader::new(
-                    egui::RichText::new(&hypersphere.name).color(color_to_egui(hypersphere.color)),
-                )
-                .id_salt(id)
-                .show(ui, |ui| {
-                    ui.horizontal(|ui| {
-                        ui.label("Name:");
-                        ui.text_edit_singleline(&mut hypersphere.name);
-                    });
-                    Self::group_ui(ui, &self.groups, &mut hypersphere.group);
-                    Self::transform_ui(
-                        ui,
-                        &self.groups,
-                        &mut hypersphere.transform,
-                        hypersphere.group,
-                    );
-                    ui.horizontal(|ui| {
-                        ui.label("Radius:");
-                        ui.add(egui::DragValue::new(&mut hypersphere.radius).speed(0.1));
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Color:");
-                        ui.color_edit_button_rgb(hypersphere.color.as_mut());
-                    });
-                    if ui.button("Delete").clicked() {
-                        to_delete.push(id);
-                    }
-                });
-                if new_id == Some(id) {
-                    ui.scroll_to_rect(response.header_response.rect, Some(egui::Align::TOP));
-                }
-            }
+            Self::hyperspheres_ui(
+                ui,
+                &self.groups,
+                &mut self.hyperspheres,
+                new_id,
+                &mut to_delete,
+            );
             for id in to_delete {
                 self.hyperspheres.remove(id);
             }
@@ -255,51 +229,21 @@ impl Objects {
                 new_id = Some(self.hyperplanes.insert(Hyperplane::default()));
             }
             let mut to_delete = vec![];
-            for (id, hyperplane) in &mut self.hyperplanes {
-                let response = egui::CollapsingHeader::new(
-                    egui::RichText::new(&hyperplane.name).color(color_to_egui(hyperplane.color)),
-                )
-                .id_salt(id)
-                .show(ui, |ui| {
-                    ui.horizontal(|ui| {
-                        ui.label("Name:");
-                        ui.text_edit_singleline(&mut hyperplane.name);
-                    });
-                    Self::group_ui(ui, &self.groups, &mut hyperplane.group);
-                    Self::transform_ui(
-                        ui,
-                        &self.groups,
-                        &mut hyperplane.transform,
-                        hyperplane.group,
-                    );
-                    ui.horizontal(|ui| {
-                        ui.label("Width:");
-                        ui.add(egui::DragValue::new(&mut hyperplane.width).speed(0.1));
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Height:");
-                        ui.add(egui::DragValue::new(&mut hyperplane.height).speed(0.1));
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Depth:");
-                        ui.add(egui::DragValue::new(&mut hyperplane.depth).speed(0.1));
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Color:");
-                        ui.color_edit_button_rgb(hyperplane.color.as_mut());
-                    });
-                    if ui.button("Delete").clicked() {
-                        to_delete.push(id);
-                    }
-                });
-                if new_id == Some(id) {
-                    ui.scroll_to_rect(response.header_response.rect, Some(egui::Align::TOP));
-                }
-            }
+            Self::hyperplanes_ui(
+                ui,
+                &self.groups,
+                &mut self.hyperplanes,
+                new_id,
+                &mut to_delete,
+            );
             for id in to_delete {
                 self.hyperplanes.remove(id);
             }
         });
+    }
+
+    pub fn grouped_ui(&mut self, ui: &mut egui::Ui) {
+        _ = ui;
     }
 
     pub fn gpu_hyperspheres(
@@ -339,6 +283,88 @@ impl Objects {
                 _padding: Default::default(),
             },
         )
+    }
+
+    fn hyperspheres_ui(
+        ui: &mut egui::Ui,
+        groups: &SlotMap<GroupID, Group>,
+        hyperspheres: &mut SlotMap<HypersphereID, Hypersphere>,
+        scroll_to_id: Option<HypersphereID>,
+        to_delete: &mut Vec<HypersphereID>,
+    ) {
+        for (id, hypersphere) in hyperspheres {
+            let response = egui::CollapsingHeader::new(
+                egui::RichText::new(&hypersphere.name).color(color_to_egui(hypersphere.color)),
+            )
+            .id_salt(id)
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label("Name:");
+                    ui.text_edit_singleline(&mut hypersphere.name);
+                });
+                Self::group_ui(ui, groups, &mut hypersphere.group);
+                Self::transform_ui(ui, groups, &mut hypersphere.transform, hypersphere.group);
+                ui.horizontal(|ui| {
+                    ui.label("Radius:");
+                    ui.add(egui::DragValue::new(&mut hypersphere.radius).speed(0.1));
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Color:");
+                    ui.color_edit_button_rgb(hypersphere.color.as_mut());
+                });
+                if ui.button("Delete").clicked() {
+                    to_delete.push(id);
+                }
+            });
+            if scroll_to_id == Some(id) {
+                ui.scroll_to_rect(response.header_response.rect, Some(egui::Align::TOP));
+            }
+        }
+    }
+
+    fn hyperplanes_ui(
+        ui: &mut egui::Ui,
+        groups: &SlotMap<GroupID, Group>,
+        hyperplanes: &mut SlotMap<HyperplaneID, Hyperplane>,
+        scroll_to_id: Option<HyperplaneID>,
+        to_delete: &mut Vec<HyperplaneID>,
+    ) {
+        for (id, hyperplane) in hyperplanes {
+            let response = egui::CollapsingHeader::new(
+                egui::RichText::new(&hyperplane.name).color(color_to_egui(hyperplane.color)),
+            )
+            .id_salt(id)
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label("Name:");
+                    ui.text_edit_singleline(&mut hyperplane.name);
+                });
+                Self::group_ui(ui, groups, &mut hyperplane.group);
+                Self::transform_ui(ui, groups, &mut hyperplane.transform, hyperplane.group);
+                ui.horizontal(|ui| {
+                    ui.label("Width:");
+                    ui.add(egui::DragValue::new(&mut hyperplane.width).speed(0.1));
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Height:");
+                    ui.add(egui::DragValue::new(&mut hyperplane.height).speed(0.1));
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Depth:");
+                    ui.add(egui::DragValue::new(&mut hyperplane.depth).speed(0.1));
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Color:");
+                    ui.color_edit_button_rgb(hyperplane.color.as_mut());
+                });
+                if ui.button("Delete").clicked() {
+                    to_delete.push(id);
+                }
+            });
+            if scroll_to_id == Some(id) {
+                ui.scroll_to_rect(response.header_response.rect, Some(egui::Align::TOP));
+            }
+        }
     }
 
     fn group_ui(

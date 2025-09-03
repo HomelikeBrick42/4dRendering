@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use slotmap::SlotMap;
 use std::{f32::consts::TAU, sync::Arc, time::Instant};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(default)]
 struct UISettings {
     info_window_open: bool,
@@ -21,6 +21,13 @@ struct UISettings {
     xwz_window_open: bool,
     xyw_window_open: bool,
     objects_window_open: bool,
+    objects_view: ObjectsView,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+enum ObjectsView {
+    Flat,
+    Grouped,
 }
 
 impl Default for UISettings {
@@ -31,11 +38,12 @@ impl Default for UISettings {
             xwz_window_open: true,
             xyw_window_open: true,
             objects_window_open: true,
+            objects_view: ObjectsView::Flat,
         }
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(default)]
 struct Scene {
     camera: Camera,
@@ -314,7 +322,30 @@ impl eframe::App for App {
             .open(&mut self.ui_settings.objects_window_open)
             .scroll(true)
             .show(ctx, |ui| {
-                self.scene.objects.ui(ui);
+                ui.horizontal(|ui| {
+                    ui.label("View Type:");
+                    egui::ComboBox::new("View Type", "")
+                        .selected_text(match self.ui_settings.objects_view {
+                            ObjectsView::Flat => "Flat",
+                            ObjectsView::Grouped => "Grouped",
+                        })
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(
+                                &mut self.ui_settings.objects_view,
+                                ObjectsView::Flat,
+                                "Flat",
+                            );
+                            ui.selectable_value(
+                                &mut self.ui_settings.objects_view,
+                                ObjectsView::Grouped,
+                                "Grouped",
+                            );
+                        });
+                });
+                match self.ui_settings.objects_view {
+                    ObjectsView::Flat => self.scene.objects.flat_ui(ui),
+                    ObjectsView::Grouped => self.scene.objects.grouped_ui(ui),
+                }
                 ui.allocate_space(ui.available_size());
             });
 
