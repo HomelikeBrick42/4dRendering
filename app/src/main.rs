@@ -6,18 +6,12 @@ use crate::{
     objects::{Group, Hyperplane, Hypersphere, Objects},
 };
 use eframe::{egui, wgpu};
+use egui_file_dialog::FileDialog;
 use math::Rotor;
 use rendering::{RenderData, RenderState, RenderTarget, ViewAxes, register_rendering_state};
 use serde::{Deserialize, Serialize};
 use slotmap::SlotMap;
 use std::{f32::consts::TAU, sync::Arc, time::Instant};
-
-#[derive(Serialize, Deserialize)]
-#[serde(default)]
-struct Scene {
-    camera: Camera,
-    objects: Objects,
-}
 
 #[derive(Serialize, Deserialize)]
 #[serde(default)]
@@ -27,6 +21,25 @@ struct UISettings {
     xwz_window_open: bool,
     xyw_window_open: bool,
     objects_window_open: bool,
+}
+
+impl Default for UISettings {
+    fn default() -> Self {
+        Self {
+            info_window_open: true,
+            camera_window_open: true,
+            xwz_window_open: true,
+            xyw_window_open: true,
+            objects_window_open: true,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(default)]
+struct Scene {
+    camera: Camera,
+    objects: Objects,
 }
 
 impl Default for Scene {
@@ -93,18 +106,6 @@ impl Default for Scene {
     }
 }
 
-impl Default for UISettings {
-    fn default() -> Self {
-        Self {
-            info_window_open: true,
-            camera_window_open: true,
-            xwz_window_open: true,
-            xyw_window_open: true,
-            objects_window_open: true,
-        }
-    }
-}
-
 struct App {
     last_time: Option<Instant>,
 
@@ -114,6 +115,15 @@ struct App {
 
     ui_settings: UISettings,
     scene: Scene,
+
+    file_dialog: FileDialog,
+    file_interaction: FileInteraction,
+}
+
+enum FileInteraction {
+    None,
+    Save,
+    Load,
 }
 
 impl App {
@@ -141,6 +151,13 @@ impl App {
                 .get_string("scene")
                 .and_then(|str| serde_json::from_str(&str).ok())
                 .unwrap_or_default(),
+
+            file_dialog: FileDialog::new()
+                .add_file_filter_extensions("Scene", vec!["scene"])
+                .default_file_filter("Scene")
+                .add_save_extension("Scene", "scene")
+                .default_save_extension("Scene"),
+            file_interaction: FileInteraction::None,
         }
     }
 }
@@ -160,6 +177,14 @@ impl eframe::App for App {
 
         egui::TopBottomPanel::top("Windows").show(ctx, |ui| {
             ui.horizontal(|ui| {
+                if ui.button("Load").clicked() {
+                    self.file_interaction = FileInteraction::Load;
+                    self.file_dialog.pick_file();
+                }
+                if ui.button("Save").clicked() {
+                    self.file_interaction = FileInteraction::Save;
+                    self.file_dialog.save_file();
+                }
                 self.ui_settings.info_window_open |= ui.button("Info").clicked();
                 self.ui_settings.camera_window_open |= ui.button("Camera").clicked();
                 self.ui_settings.xwz_window_open |= ui.button("XWZ View").clicked();
@@ -167,6 +192,34 @@ impl eframe::App for App {
                 self.ui_settings.objects_window_open |= ui.button("Objects").clicked();
             });
         });
+
+        self.file_dialog.update(ctx);
+        if let Some(mut path) = self.file_dialog.take_picked() {
+            match std::mem::replace(&mut self.file_interaction, FileInteraction::None) {
+                FileInteraction::None => {}
+                FileInteraction::Save => {
+                    if path.extension().is_none() {
+                        path.set_extension("scene");
+                    }
+                    let state = serde_json::to_string(&self.scene).unwrap();
+                    if let Err(e) = std::fs::write(&path, state) {
+                        eprintln!("Error when writing scene '{}': {e}", path.to_string_lossy());
+                    }
+                }
+                FileInteraction::Load => {
+                    if let Ok(s) = std::fs::read_to_string(&path).inspect_err(|e| {
+                        eprintln!("Error when loading scene '{}': {e}", path.to_string_lossy());
+                    }) && let Ok(state) = serde_json::from_str(&s).inspect_err(|e| {
+                        eprintln!(
+                            "Error when deserialising scene '{}': {e}",
+                            path.to_string_lossy()
+                        );
+                    }) {
+                        self.scene = state;
+                    }
+                }
+            }
+        }
 
         {
             let mut reset = false;
