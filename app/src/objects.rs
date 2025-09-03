@@ -3,6 +3,7 @@ use eframe::egui;
 use math::Rotor;
 use serde::{Deserialize, Serialize};
 use slotmap::{SlotMap, new_key_type};
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Transform {
@@ -194,16 +195,6 @@ impl Objects {
             }
             for id in to_delete {
                 self.groups.remove(id);
-                for hypersphere in self.hyperspheres.values_mut() {
-                    if hypersphere.group == Some(id) {
-                        hypersphere.group = None;
-                    }
-                }
-                for hyperplane in self.hyperplanes.values_mut() {
-                    if hyperplane.group == Some(id) {
-                        hyperplane.group = None;
-                    }
-                }
             }
         });
         ui.collapsing("Hyperspheres", |ui| {
@@ -212,10 +203,12 @@ impl Objects {
                 new_id = Some(self.hyperspheres.insert(Hypersphere::default()));
             }
             let mut to_delete = vec![];
+            let ids = self.hyperspheres.keys().collect::<Vec<_>>();
             Self::hyperspheres_ui(
                 ui,
                 &self.groups,
                 &mut self.hyperspheres,
+                ids.into_iter(),
                 new_id,
                 &mut to_delete,
             );
@@ -229,10 +222,12 @@ impl Objects {
                 new_id = Some(self.hyperplanes.insert(Hyperplane::default()));
             }
             let mut to_delete = vec![];
+            let ids = self.hyperplanes.keys().collect::<Vec<_>>();
             Self::hyperplanes_ui(
                 ui,
                 &self.groups,
                 &mut self.hyperplanes,
+                ids.into_iter(),
                 new_id,
                 &mut to_delete,
             );
@@ -243,7 +238,112 @@ impl Objects {
     }
 
     pub fn grouped_ui(&mut self, ui: &mut egui::Ui) {
-        _ = ui;
+        let mut new_group_id = None;
+        if ui.button("New Group").clicked() {
+            new_group_id = Some(self.groups.insert(Group::default()));
+        }
+        let mut groups_to_delete = vec![];
+
+        let mut new_hypersphere_id = None;
+        if ui.button("New Hypersphere").clicked() {
+            new_hypersphere_id = Some(self.hyperspheres.insert(Hypersphere::default()));
+        }
+        let mut hyperspheres_to_delete = vec![];
+
+        let mut new_hyperplane_id = None;
+        if ui.button("New Hyperplane").clicked() {
+            new_hyperplane_id = Some(self.hyperplanes.insert(Hyperplane::default()));
+        }
+        let mut hyperplanes_to_delete = vec![];
+
+        #[derive(Default)]
+        struct GroupedObjects {
+            hyperspheres: Vec<HypersphereID>,
+            hyperplanes: Vec<HyperplaneID>,
+        }
+        let mut grouped_objects = BTreeMap::<Option<GroupID>, GroupedObjects>::new();
+        for id in self.groups.keys() {
+            grouped_objects.entry(Some(id)).or_default();
+        }
+        for (id, hypersphere) in &self.hyperspheres {
+            grouped_objects
+                .entry(hypersphere.group)
+                .or_default()
+                .hyperspheres
+                .push(id);
+        }
+        for (id, hyperplane) in &self.hyperplanes {
+            grouped_objects
+                .entry(hyperplane.group)
+                .or_default()
+                .hyperplanes
+                .push(id);
+        }
+
+        for (id, grouped_objects) in grouped_objects {
+            let response = egui::CollapsingHeader::new(if let Some(group_id) = id {
+                if let Some(group) = self.groups.get(group_id) {
+                    &group.name
+                } else {
+                    "Invalid"
+                }
+            } else {
+                "None"
+            })
+            .id_salt(id)
+            .show(ui, |ui| {
+                if let Some(group_id) = id
+                    && let Some(group) = self.groups.get_mut(group_id)
+                {
+                    ui.horizontal(|ui| {
+                        ui.label("Name:");
+                        ui.text_edit_singleline(&mut group.name);
+                    });
+                    ui.collapsing("Transform", |ui| {
+                        group.transform.ui(ui);
+                    });
+                    if ui.button("Delete").clicked() {
+                        groups_to_delete.push(group_id);
+                    }
+                }
+                ui.collapsing("Hyperspheres", |ui| {
+                    Self::hyperspheres_ui(
+                        ui,
+                        &self.groups,
+                        &mut self.hyperspheres,
+                        grouped_objects.hyperspheres.iter().copied(),
+                        new_hypersphere_id,
+                        &mut hyperspheres_to_delete,
+                    );
+                });
+                ui.collapsing("Hyperplanes", |ui| {
+                    Self::hyperplanes_ui(
+                        ui,
+                        &self.groups,
+                        &mut self.hyperplanes,
+                        grouped_objects.hyperplanes.iter().copied(),
+                        new_hyperplane_id,
+                        &mut hyperplanes_to_delete,
+                    );
+                });
+            });
+
+            if let Some(id) = id
+                && new_group_id == Some(id)
+            {
+                ui.scroll_to_rect(response.header_response.rect, Some(egui::Align::TOP));
+            }
+        }
+
+        for id in groups_to_delete {
+            self.groups.remove(id);
+        }
+        for id in hyperspheres_to_delete {
+            self.hyperspheres.remove(id);
+        }
+        for id in hyperplanes_to_delete {
+            self.hyperplanes.remove(id);
+        }
     }
 
     pub fn gpu_hyperspheres(
@@ -289,10 +389,12 @@ impl Objects {
         ui: &mut egui::Ui,
         groups: &SlotMap<GroupID, Group>,
         hyperspheres: &mut SlotMap<HypersphereID, Hypersphere>,
+        hypersphere_ids: impl Iterator<Item = HypersphereID>,
         scroll_to_id: Option<HypersphereID>,
         to_delete: &mut Vec<HypersphereID>,
     ) {
-        for (id, hypersphere) in hyperspheres {
+        for id in hypersphere_ids {
+            let hypersphere = &mut hyperspheres[id];
             let response = egui::CollapsingHeader::new(
                 egui::RichText::new(&hypersphere.name).color(color_to_egui(hypersphere.color)),
             )
@@ -326,10 +428,12 @@ impl Objects {
         ui: &mut egui::Ui,
         groups: &SlotMap<GroupID, Group>,
         hyperplanes: &mut SlotMap<HyperplaneID, Hyperplane>,
+        hyperplane_ids: impl Iterator<Item = HyperplaneID>,
         scroll_to_id: Option<HyperplaneID>,
         to_delete: &mut Vec<HyperplaneID>,
     ) {
-        for (id, hyperplane) in hyperplanes {
+        for id in hyperplane_ids {
+            let hyperplane = &mut hyperplanes[id];
             let response = egui::CollapsingHeader::new(
                 egui::RichText::new(&hyperplane.name).color(color_to_egui(hyperplane.color)),
             )
@@ -375,15 +479,15 @@ impl Objects {
         ui.horizontal(|ui| {
             ui.label("Group:");
             egui::ComboBox::new("Group", "")
-                .selected_text(
-                    if let Some(group_id) = *group_id
-                        && let Some(group) = groups.get(group_id)
-                    {
+                .selected_text(if let Some(group_id) = *group_id {
+                    if let Some(group) = groups.get(group_id) {
                         &group.name
                     } else {
-                        "None"
-                    },
-                )
+                        "Invalid"
+                    }
+                } else {
+                    "None"
+                })
                 .show_ui(ui, |ui| {
                     ui.selectable_value(group_id, None, "None");
                     for (id, group) in groups {
