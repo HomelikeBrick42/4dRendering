@@ -3,7 +3,7 @@ pub mod objects;
 
 use crate::{
     camera::Camera,
-    objects::{Hyperplane, Hypersphere, Objects},
+    objects::{Group, Hyperplane, Hypersphere, Objects},
 };
 use eframe::{egui, wgpu};
 use math::Rotor;
@@ -25,6 +25,7 @@ struct App {
     xyw_window_open: bool,
     xyw_render_target: RenderTarget,
 
+    objects_window_open: bool,
     objects: Objects,
 }
 
@@ -35,11 +36,22 @@ impl App {
         register_rendering_state(cc);
 
         let mut objects = Objects {
-            group_transforms: SlotMap::with_key(),
+            groups: SlotMap::with_key(),
             hyperspheres: SlotMap::with_key(),
             hyperplanes: SlotMap::with_key(),
         };
 
+        objects.groups.insert(Group {
+            name: "Test Group".into(),
+            transform: objects::Transform {
+                position: cgmath::Vector4 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
+                    w: 0.0,
+                },
+            },
+        });
         objects.hyperspheres.insert(Hypersphere {
             name: "Red".into(),
             group: None,
@@ -98,6 +110,7 @@ impl App {
             xyw_window_open: true,
             xyw_render_target: RenderTarget::new(device, 1, 1),
 
+            objects_window_open: true,
             objects,
         }
     }
@@ -122,6 +135,7 @@ impl eframe::App for App {
                 self.camera_window_open |= ui.button("Camera").clicked();
                 self.xwz_window_open |= ui.button("XWZ View").clicked();
                 self.xyw_window_open |= ui.button("XYW View").clicked();
+                self.objects_window_open |= ui.button("Objects").clicked();
             });
         });
 
@@ -197,6 +211,14 @@ impl eframe::App for App {
                         ui_vector4(ui, &mut transform.w());
                     });
                 });
+                ui.allocate_space(ui.available_size());
+            });
+
+        egui::Window::new("Objects")
+            .open(&mut self.objects_window_open)
+            .scroll(true)
+            .show(ctx, |ui| {
+                self.objects.ui(ui);
                 ui.allocate_space(ui.available_size());
             });
 
