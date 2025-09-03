@@ -65,11 +65,19 @@ fn intersect_hypersphere(ray: Ray, hypersphere: Hypersphere) -> Hit {
     let discriminant = h * h - a * c;
 
     if discriminant >= 0.0 {
-        hit.distance = (h - sqrt(discriminant)) / a;
+        let d1 = (h - sqrt(discriminant)) / a;
+        let d2 = (h + sqrt(discriminant)) / a;
+        hit.distance = d1;
+        if d1 < 0.0 {
+            hit.distance = d2;
+        }
         if hit.distance > 0.0 {
             hit.hit = true;
             hit.position = ray.origin + ray.direction * hit.distance;
             hit.normal = (hit.position - position) / hypersphere.radius;
+            if hit.distance == d2 {
+                hit.normal = - hit.normal;
+            }
             hit.color = hypersphere.color;
         }
     }
@@ -94,13 +102,13 @@ fn intersect_hyperplane(ray: Ray, hyperplane: Hyperplane) -> Hit {
     hit.distance = abs(transformed_ray.origin.y / transformed_ray.direction.y);
 
     let relative_point = transformed_ray.origin + transformed_ray.direction * hit.distance;
-    if abs(relative_point.x) > hyperplane.height * 0.5 {
+    if !(abs(relative_point.x) <= hyperplane.height * 0.5) {
         return hit;
     }
-    if abs(relative_point.z) > hyperplane.width * 0.5 {
+    if !(abs(relative_point.z) <= hyperplane.width * 0.5) {
         return hit;
     }
-    if abs(relative_point.w) > hyperplane.depth * 0.5 {
+    if !(abs(relative_point.w) <= hyperplane.depth * 0.5) {
         return hit;
     }
 
