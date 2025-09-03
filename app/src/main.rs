@@ -109,8 +109,8 @@ impl eframe::App for App {
                     if ui.button("Align XYZ").clicked() {
                         self.camera.main_rotation = Rotor::identity();
                     }
-                    if ui.button("Align XWZ").clicked() {
-                        self.camera.main_rotation = Rotor::rotate_yw(0.25 * TAU);
+                    if ui.button("Align WYZ").clicked() {
+                        self.camera.main_rotation = Rotor::rotate_xw(0.25 * TAU);
                     }
                     if ui.button("Align XYW").clicked() {
                         self.camera.main_rotation = Rotor::rotate_zw(0.25 * TAU);
