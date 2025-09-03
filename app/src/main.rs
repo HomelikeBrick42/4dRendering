@@ -335,7 +335,7 @@ impl eframe::App for App {
             );
         }
 
-        if !ctx.wants_keyboard_input() && !ctx.wants_pointer_input() {
+        if !ctx.wants_keyboard_input() && !ctx.is_using_pointer() {
             ctx.input(|i| self.scene.camera.update(dt, i));
         }
 
