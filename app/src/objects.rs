@@ -1,9 +1,10 @@
 use crate::ui_vector4;
 use eframe::egui;
 use math::Rotor;
+use serde::{Deserialize, Serialize};
 use slotmap::{SlotMap, new_key_type};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Transform {
     pub position: cgmath::Vector4<f32>,
     pub xy_rotation: f32,
@@ -77,13 +78,24 @@ impl Transform {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Group {
     pub name: String,
     pub transform: Transform,
 }
 
-#[derive(Debug, Clone)]
+impl Default for Group {
+    fn default() -> Self {
+        Self {
+            name: "Default Group".into(),
+            transform: Transform::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Hypersphere {
     pub name: String,
     pub group: Option<GroupID>,
@@ -92,7 +104,24 @@ pub struct Hypersphere {
     pub color: cgmath::Vector3<f32>,
 }
 
-#[derive(Debug, Clone)]
+impl Default for Hypersphere {
+    fn default() -> Self {
+        Self {
+            name: "Default Hypersphere".into(),
+            group: None,
+            transform: Transform::default(),
+            radius: 1.0,
+            color: cgmath::Vector3 {
+                x: 1.0,
+                y: 1.0,
+                z: 1.0,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Hyperplane {
     pub name: String,
     pub group: Option<GroupID>,
@@ -103,13 +132,32 @@ pub struct Hyperplane {
     pub color: cgmath::Vector3<f32>,
 }
 
+impl Default for Hyperplane {
+    fn default() -> Self {
+        Self {
+            name: "Default Hyperplane".into(),
+            group: None,
+            transform: Transform::default(),
+            width: 1.0,
+            height: 1.0,
+            depth: 1.0,
+            color: cgmath::Vector3 {
+                x: 1.0,
+                y: 1.0,
+                z: 1.0,
+            },
+        }
+    }
+}
+
 new_key_type! {
     pub struct GroupID;
     pub struct HypersphereID;
     pub struct HyperplaneID;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Objects {
     pub groups: SlotMap<GroupID, Group>,
     pub hyperspheres: SlotMap<HypersphereID, Hypersphere>,

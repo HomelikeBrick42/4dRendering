@@ -8,32 +8,35 @@ use crate::{
 use eframe::{egui, wgpu};
 use math::Rotor;
 use rendering::{RenderData, RenderState, RenderTarget, ViewAxes, register_rendering_state};
+use serde::{Deserialize, Serialize};
 use slotmap::SlotMap;
 use std::{f32::consts::TAU, sync::Arc, time::Instant};
 
-struct App {
-    last_time: Option<Instant>,
-
-    info_window_open: bool,
-
-    camera_window_open: bool,
+#[derive(Serialize, Deserialize)]
+#[serde(default)]
+struct Scene {
     camera: Camera,
-
-    xyz_render_target: RenderTarget,
-    xwz_window_open: bool,
-    xwz_render_target: RenderTarget,
-    xyw_window_open: bool,
-    xyw_render_target: RenderTarget,
-
-    objects_window_open: bool,
     objects: Objects,
 }
 
-impl App {
-    fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let eframe::egui_wgpu::RenderState { device, .. } = cc.wgpu_render_state.as_ref().unwrap();
+#[derive(Serialize, Deserialize)]
+#[serde(default)]
+struct UISettings {
+    info_window_open: bool,
+    camera_window_open: bool,
+    xwz_window_open: bool,
+    xyw_window_open: bool,
+    objects_window_open: bool,
+}
 
-        register_rendering_state(cc);
+impl Default for Scene {
+    fn default() -> Self {
+        let camera = Camera::new(cgmath::Vector4 {
+            x: -3.0,
+            y: 1.0,
+            z: 0.0,
+            w: 0.0,
+        });
 
         let mut objects = Objects {
             groups: SlotMap::with_key(),
@@ -86,27 +89,58 @@ impl App {
             },
         });
 
+        Self { camera, objects }
+    }
+}
+
+impl Default for UISettings {
+    fn default() -> Self {
+        Self {
+            info_window_open: true,
+            camera_window_open: true,
+            xwz_window_open: true,
+            xyw_window_open: true,
+            objects_window_open: true,
+        }
+    }
+}
+
+struct App {
+    last_time: Option<Instant>,
+
+    xyz_render_target: RenderTarget,
+    xwz_render_target: RenderTarget,
+    xyw_render_target: RenderTarget,
+
+    ui_settings: UISettings,
+    scene: Scene,
+}
+
+impl App {
+    fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        let eframe::egui_wgpu::RenderState { device, .. } = cc.wgpu_render_state.as_ref().unwrap();
+
+        register_rendering_state(cc);
+
         Self {
             last_time: None,
 
-            info_window_open: true,
-
-            camera_window_open: true,
-            camera: Camera::new(cgmath::Vector4 {
-                x: -3.0,
-                y: 1.0,
-                z: 0.0,
-                w: 0.0,
-            }),
-
             xyz_render_target: RenderTarget::new(device, 1, 1),
-            xwz_window_open: true,
             xwz_render_target: RenderTarget::new(device, 1, 1),
-            xyw_window_open: true,
             xyw_render_target: RenderTarget::new(device, 1, 1),
 
-            objects_window_open: true,
-            objects,
+            ui_settings: cc
+                .storage
+                .unwrap()
+                .get_string("ui_settings")
+                .and_then(|str| serde_json::from_str(&str).ok())
+                .unwrap_or_default(),
+            scene: cc
+                .storage
+                .unwrap()
+                .get_string("scene")
+                .and_then(|str| serde_json::from_str(&str).ok())
+                .unwrap_or_default(),
         }
     }
 }
@@ -126,65 +160,79 @@ impl eframe::App for App {
 
         egui::TopBottomPanel::top("Windows").show(ctx, |ui| {
             ui.horizontal(|ui| {
-                self.info_window_open |= ui.button("Info").clicked();
-                self.camera_window_open |= ui.button("Camera").clicked();
-                self.xwz_window_open |= ui.button("XWZ View").clicked();
-                self.xyw_window_open |= ui.button("XYW View").clicked();
-                self.objects_window_open |= ui.button("Objects").clicked();
+                self.ui_settings.info_window_open |= ui.button("Info").clicked();
+                self.ui_settings.camera_window_open |= ui.button("Camera").clicked();
+                self.ui_settings.xwz_window_open |= ui.button("XWZ View").clicked();
+                self.ui_settings.xyw_window_open |= ui.button("XYW View").clicked();
+                self.ui_settings.objects_window_open |= ui.button("Objects").clicked();
             });
         });
 
-        egui::Window::new("Info")
-            .open(&mut self.info_window_open)
-            .scroll(true)
-            .show(ctx, |ui| {
-                ui.label(format!("FPS: {:.3}", 1.0 / dt));
-                ui.label(format!("Frame Time: {:.3}ms", 1000.0 * dt));
-                ui.allocate_space(ui.available_size());
-            });
+        {
+            let mut reset = false;
+            egui::Window::new("Info")
+                .open(&mut self.ui_settings.info_window_open)
+                .scroll(true)
+                .show(ctx, |ui| {
+                    ui.label(format!("FPS: {:.3}", 1.0 / dt));
+                    ui.label(format!("Frame Time: {:.3}ms", 1000.0 * dt));
+                    reset |= ui.button("RESET EVERYTHING").clicked();
+                    ui.allocate_space(ui.available_size());
+                });
+            if reset {
+                self.ui_settings = Default::default();
+                self.scene = Default::default();
+            }
+        }
 
         egui::Window::new("Camera")
-            .open(&mut self.camera_window_open)
+            .open(&mut self.ui_settings.camera_window_open)
             .scroll(true)
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.label("Position:");
-                    ui_vector4(ui, &mut self.camera.position);
+                    ui_vector4(ui, &mut self.scene.camera.position);
                 });
                 ui.horizontal(|ui| {
                     ui.label("Move Speed:");
-                    ui.add(egui::DragValue::new(&mut self.camera.move_speed).speed(0.1));
+                    ui.add(egui::DragValue::new(&mut self.scene.camera.move_speed).speed(0.1));
                 });
                 ui.horizontal(|ui| {
                     ui.label("Rotation Speed:");
-                    ui.add(egui::DragValue::new(&mut self.camera.rotation_speed).speed(0.1));
-                    self.camera.rotation_speed = self.camera.rotation_speed.max(0.0);
+                    ui.add(egui::DragValue::new(&mut self.scene.camera.rotation_speed).speed(0.1));
+                    self.scene.camera.rotation_speed = self.scene.camera.rotation_speed.max(0.0);
                 });
                 ui.collapsing("Align", |ui| {
                     if ui.button("Reset XY Rotation").clicked() {
-                        self.camera.xy_rotation = 0.0;
+                        self.scene.camera.xy_rotation = 0.0;
                     }
                     if ui.button("Rotate to WYZ").clicked() {
-                        self.camera.main_rotation =
-                            self.camera.main_rotation.then(Rotor::rotate_xw(0.25 * TAU));
+                        self.scene.camera.main_rotation = self
+                            .scene
+                            .camera
+                            .main_rotation
+                            .then(Rotor::rotate_xw(0.25 * TAU));
                     }
                     if ui.button("Rotate to XYW").clicked() {
-                        self.camera.main_rotation =
-                            self.camera.main_rotation.then(Rotor::rotate_zw(0.25 * TAU));
+                        self.scene.camera.main_rotation = self
+                            .scene
+                            .camera
+                            .main_rotation
+                            .then(Rotor::rotate_zw(0.25 * TAU));
                     }
                     ui.label("These align buttons assume that the current XY rotation is 0");
                     if ui.button("Align XYZ").clicked() {
-                        self.camera.main_rotation = Rotor::identity();
+                        self.scene.camera.main_rotation = Rotor::identity();
                     }
                     if ui.button("Align WYZ").clicked() {
-                        self.camera.main_rotation = Rotor::rotate_xw(0.25 * TAU);
+                        self.scene.camera.main_rotation = Rotor::rotate_xw(0.25 * TAU);
                     }
                     if ui.button("Align XYW").clicked() {
-                        self.camera.main_rotation = Rotor::rotate_zw(0.25 * TAU);
+                        self.scene.camera.main_rotation = Rotor::rotate_zw(0.25 * TAU);
                     }
                 });
                 ui.add_enabled_ui(false, |ui| {
-                    let transform = self.camera.transform();
+                    let transform = self.scene.camera.transform();
                     ui.horizontal(|ui| {
                         ui.label("Position:");
                         ui_vector4(ui, &mut transform.position());
@@ -210,10 +258,10 @@ impl eframe::App for App {
             });
 
         egui::Window::new("Objects")
-            .open(&mut self.objects_window_open)
+            .open(&mut self.ui_settings.objects_window_open)
             .scroll(true)
             .show(ctx, |ui| {
-                self.objects.ui(ui);
+                self.scene.objects.ui(ui);
                 ui.allocate_space(ui.available_size());
             });
 
@@ -225,29 +273,29 @@ impl eframe::App for App {
             render_state.update_hyperspheres(
                 device,
                 queue,
-                &self.objects.gpu_hyperspheres().collect::<Vec<_>>(),
+                &self.scene.objects.gpu_hyperspheres().collect::<Vec<_>>(),
             );
             render_state.update_hyperplanees(
                 device,
                 queue,
-                &self.objects.gpu_hyperplanes().collect::<Vec<_>>(),
+                &self.scene.objects.gpu_hyperplanes().collect::<Vec<_>>(),
             );
         }
 
         if !ctx.wants_keyboard_input() && !ctx.wants_pointer_input() {
-            ctx.input(|i| self.camera.update(dt, i));
+            ctx.input(|i| self.scene.camera.update(dt, i));
         }
 
         egui::Window::new("XWZ View")
             .frame(egui::Frame::window(&ctx.style()).inner_margin(egui::Margin::ZERO))
-            .open(&mut self.xwz_window_open)
+            .open(&mut self.ui_settings.xwz_window_open)
             .resizable(true)
             .show(ctx, |ui| {
                 ui_render_target(
                     ui,
                     device,
                     &mut self.xwz_render_target,
-                    &self.camera,
+                    &self.scene.camera,
                     ViewAxes::XWZ,
                     ui.available_size(),
                 );
@@ -255,14 +303,14 @@ impl eframe::App for App {
 
         egui::Window::new("XYW View")
             .frame(egui::Frame::window(&ctx.style()).inner_margin(egui::Margin::ZERO))
-            .open(&mut self.xyw_window_open)
+            .open(&mut self.ui_settings.xyw_window_open)
             .resizable(true)
             .show(ctx, |ui| {
                 ui_render_target(
                     ui,
                     device,
                     &mut self.xyw_render_target,
-                    &self.camera,
+                    &self.scene.camera,
                     ViewAxes::XYW,
                     ui.available_size(),
                 );
@@ -275,13 +323,21 @@ impl eframe::App for App {
                     ui,
                     device,
                     &mut self.xyz_render_target,
-                    &self.camera,
+                    &self.scene.camera,
                     ViewAxes::XYZ,
                     ui.available_size(),
                 );
             });
 
         ctx.request_repaint();
+    }
+
+    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        storage.set_string(
+            "ui_settings",
+            serde_json::to_string(&self.ui_settings).unwrap(),
+        );
+        storage.set_string("scene", serde_json::to_string(&self.scene).unwrap());
     }
 }
 

@@ -1,7 +1,10 @@
 use eframe::egui;
 use math::{Rotor, Transform};
+use serde::{Deserialize, Serialize};
 use std::f32::consts::TAU;
 
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Camera {
     pub position: cgmath::Vector4<f32>,
     pub main_rotation: Rotor,
@@ -9,6 +12,17 @@ pub struct Camera {
 
     pub move_speed: f32,
     pub rotation_speed: f32,
+}
+
+impl Default for Camera {
+    fn default() -> Self {
+        Self::new(cgmath::Vector4 {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            w: 0.0,
+        })
+    }
 }
 
 impl Camera {

@@ -2,6 +2,7 @@ pub use impls::{Rotor, Transform};
 
 mod impls {
     use bytemuck::{Pod, Zeroable};
+    use serde::{Deserialize, Serialize};
 
     ga_generator::ga! {
         element_type = f32;
@@ -16,7 +17,7 @@ mod impls {
         group VgaQuadvector  = VgaVector ^ VgaTrivector;
         group VgaPentavector = VgaVector ^ VgaQuadvector;
 
-        group #[derive(Zeroable, Pod)] #[repr(C)] Rotor = Scalar + VgaBivector + VgaQuadvector;
+        group #[derive(Zeroable, Pod, Serialize, Deserialize)] #[repr(C)] Rotor = Scalar + VgaBivector + VgaQuadvector;
 
         group RotorSquaredMagnitude = Scalar + VgaQuadvector;
         fn rotor_squared_magnitude(rotor: Rotor) -> RotorSquaredMagnitude {
@@ -157,7 +158,7 @@ mod impls {
         group PgaQuadvector  = PgaVector ^ PgaTrivector;
         group PgaPentavector = PgaVector ^ PgaQuadvector;
 
-        group #[derive(Zeroable, Pod)] #[repr(C)] Transform = Scalar + PgaBivector + PgaQuadvector;
+        group #[derive(Zeroable, Pod, Serialize, Deserialize)] #[repr(C)] Transform = Scalar + PgaBivector + PgaQuadvector;
 
         group TransformSquaredMagnitude = Scalar + PgaQuadvector;
         fn transform_squared_magnitude(transform: Transform) -> TransformSquaredMagnitude {
