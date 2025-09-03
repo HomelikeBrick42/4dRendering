@@ -322,17 +322,8 @@ impl eframe::App for App {
             let callback_resources = &mut renderer.write().callback_resources;
             let render_state: &mut RenderState = callback_resources.get_mut().unwrap();
 
-            // TODO: update this so the iterator can be passed directly in, instead of making a new Vec every time
-            render_state.update_hyperspheres(
-                device,
-                queue,
-                &self.scene.objects.gpu_hyperspheres().collect::<Vec<_>>(),
-            );
-            render_state.update_hyperplanees(
-                device,
-                queue,
-                &self.scene.objects.gpu_hyperplanes().collect::<Vec<_>>(),
-            );
+            render_state.update_hyperspheres(device, queue, self.scene.objects.gpu_hyperspheres());
+            render_state.update_hyperplanees(device, queue, self.scene.objects.gpu_hyperplanes());
         }
 
         if !ctx.wants_keyboard_input() && !ctx.is_using_pointer() {

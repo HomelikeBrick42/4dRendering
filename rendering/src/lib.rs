@@ -248,9 +248,11 @@ impl RenderState {
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        hyperspheres: &[Hypersphere],
+        hyperspheres: impl ExactSizeIterator<Item = Hypersphere>,
     ) {
-        if size_of_val(hyperspheres) > self.hyperspheres_buffer.size() as _ {
+        let len = hyperspheres.len();
+        let size = size_of::<Hypersphere>();
+        if len * size > self.hyperspheres_buffer.size() as _ {
             self.hyperspheres_buffer = hyperspheres_buffer(device, hyperspheres.len());
             self.objects_bind_group = objects_bind_group(
                 device,
@@ -260,24 +262,32 @@ impl RenderState {
             );
         }
         queue.write_buffer(
-            &self.hyperspheres_buffer,
-            0,
-            bytemuck::cast_slice(hyperspheres),
-        );
-        queue.write_buffer(
             &self.scene_info_buffer,
             offset_of!(SceneInfo, hyperspheres_count) as _,
             &u32::to_ne_bytes(hyperspheres.len().try_into().unwrap()),
         );
+        let mut hyperspheres_buffer = queue
+            .write_buffer_with(
+                &self.hyperspheres_buffer,
+                0,
+                u64::try_from(len * size).unwrap().try_into().unwrap(),
+            )
+            .unwrap();
+        for (i, hypersphere) in hyperspheres.enumerate() {
+            hyperspheres_buffer[i * size..][..size]
+                .copy_from_slice(bytemuck::bytes_of(&hypersphere));
+        }
     }
 
     pub fn update_hyperplanees(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        hyperplanes: &[Hyperplane],
+        hyperplanes: impl ExactSizeIterator<Item = Hyperplane>,
     ) {
-        if size_of_val(hyperplanes) > self.hyperplanes_buffer.size() as _ {
+        let len = hyperplanes.len();
+        let size = size_of::<Hyperplane>();
+        if len * size > self.hyperplanes_buffer.size() as _ {
             self.hyperplanes_buffer = hyperplanes_buffer(device, hyperplanes.len());
             self.objects_bind_group = objects_bind_group(
                 device,
@@ -287,15 +297,20 @@ impl RenderState {
             );
         }
         queue.write_buffer(
-            &self.hyperplanes_buffer,
-            0,
-            bytemuck::cast_slice(hyperplanes),
-        );
-        queue.write_buffer(
             &self.scene_info_buffer,
             offset_of!(SceneInfo, hyperplanes_count) as _,
-            &u32::to_ne_bytes(hyperplanes.len().try_into().unwrap()),
+            &u32::to_ne_bytes(len.try_into().unwrap()),
         );
+        let mut hyperplanes_buffer = queue
+            .write_buffer_with(
+                &self.hyperplanes_buffer,
+                0,
+                u64::try_from(len * size).unwrap().try_into().unwrap(),
+            )
+            .unwrap();
+        for (i, hyperplane) in hyperplanes.enumerate() {
+            hyperplanes_buffer[i * size..][..size].copy_from_slice(bytemuck::bytes_of(&hyperplane));
+        }
     }
 }
 
