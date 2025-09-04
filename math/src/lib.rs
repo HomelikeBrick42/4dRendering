@@ -1,4 +1,4 @@
-pub use impls::{Rotor, Transform};
+pub use impls::{DecomposedRotor, DecomposedTransform, Rotor, Transform};
 
 mod impls {
     use bytemuck::{Pod, Zeroable};
@@ -22,6 +22,30 @@ mod impls {
         group RotorSquaredMagnitude = Scalar + VgaQuadvector;
         fn rotor_squared_magnitude(rotor: Rotor) -> RotorSquaredMagnitude {
             return ~rotor * rotor;
+        }
+
+        fn rotate_xy(cos_theta: Scalar, sin_theta: Scalar, rotor: Rotor) -> Rotor {
+            return (cos_theta + sin_theta * (e1 * e2)) * rotor;
+        }
+
+        fn rotate_xz(cos_theta: Scalar, sin_theta: Scalar, rotor: Rotor) -> Rotor {
+            return (cos_theta + sin_theta * (e1 * e3)) * rotor;
+        }
+
+        fn rotate_xw(cos_theta: Scalar, sin_theta: Scalar, rotor: Rotor) -> Rotor {
+            return (cos_theta + sin_theta * (e1 * e4)) * rotor;
+        }
+
+        fn rotate_yz(cos_theta: Scalar, sin_theta: Scalar, rotor: Rotor) -> Rotor {
+            return (cos_theta + sin_theta * (e2 * e3)) * rotor;
+        }
+
+        fn rotate_yw(cos_theta: Scalar, sin_theta: Scalar, rotor: Rotor) -> Rotor {
+            return (cos_theta + sin_theta * (e2 * e4)) * rotor;
+        }
+
+        fn rotate_zw(cos_theta: Scalar, sin_theta: Scalar, rotor: Rotor) -> Rotor {
+            return (cos_theta + sin_theta * (e3 * e4)) * rotor;
         }
 
         fn rotor_then(a: Rotor, b: Rotor) -> Rotor {
@@ -337,6 +361,77 @@ mod impls {
                 rotor_w(self);
             cgmath::Vector4 { x, y, z, w }
         }
+
+        #[inline]
+        pub fn decompose(mut self) -> DecomposedRotor {
+            let zw_angle = if self.s != 0.0 || self.e3e4 != 0.0 {
+                let angle = f32::atan2(self.e3e4, self.s);
+                let (sin, cos) = (-angle).sin_cos();
+                self = rotate_zw(Scalar { s: cos }, Scalar { s: sin }, self);
+                2.0 * angle
+            } else {
+                0.0
+            };
+            let yw_angle = if self.s != 0.0 || self.e2e4 != 0.0 {
+                let angle = f32::atan2(self.e2e4, self.s);
+                let (sin, cos) = (-angle).sin_cos();
+                self = rotate_yw(Scalar { s: cos }, Scalar { s: sin }, self);
+                2.0 * angle
+            } else {
+                0.0
+            };
+            let yz_angle = if self.s != 0.0 || self.e2e3 != 0.0 {
+                let angle = f32::atan2(self.e2e3, self.s);
+                let (sin, cos) = (-angle).sin_cos();
+                self = rotate_yz(Scalar { s: cos }, Scalar { s: sin }, self);
+                2.0 * angle
+            } else {
+                0.0
+            };
+            let xw_angle = if self.s != 0.0 || self.e1e4 != 0.0 {
+                let angle = f32::atan2(self.e1e4, self.s);
+                let (sin, cos) = (-angle).sin_cos();
+                self = rotate_xw(Scalar { s: cos }, Scalar { s: sin }, self);
+                2.0 * angle
+            } else {
+                0.0
+            };
+            let xz_angle = if self.s != 0.0 || self.e1e3 != 0.0 {
+                let angle = f32::atan2(self.e1e3, self.s);
+                let (sin, cos) = (-angle).sin_cos();
+                self = rotate_xz(Scalar { s: cos }, Scalar { s: sin }, self);
+                2.0 * angle
+            } else {
+                0.0
+            };
+            let xy_angle = if self.s != 0.0 || self.e1e2 != 0.0 {
+                let angle = f32::atan2(self.e1e2, self.s);
+                let (sin, cos) = (-angle).sin_cos();
+                self = rotate_xy(Scalar { s: cos }, Scalar { s: sin }, self);
+                2.0 * angle
+            } else {
+                0.0
+            };
+            _ = self;
+            DecomposedRotor {
+                xy_angle,
+                xz_angle,
+                xw_angle,
+                yz_angle,
+                yw_angle,
+                zw_angle,
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    pub struct DecomposedRotor {
+        pub xy_angle: f32,
+        pub xz_angle: f32,
+        pub xw_angle: f32,
+        pub yz_angle: f32,
+        pub yw_angle: f32,
+        pub zw_angle: f32,
     }
 
     impl Transform {
@@ -508,5 +603,20 @@ mod impls {
                 e1e2e3e4,
             }
         }
+
+        #[inline]
+        pub fn decompose(self) -> DecomposedTransform {
+            let translation = self.position();
+            let rotation = self.rotor_part().decompose();
+            DecomposedTransform {
+                translation,
+                rotation,
+            }
+        }
+    }
+
+    pub struct DecomposedTransform {
+        pub translation: cgmath::Vector4<f32>,
+        pub rotation: DecomposedRotor,
     }
 }
